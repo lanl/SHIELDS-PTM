@@ -1,0 +1,4 @@
+1        				 idens
+-5.0    				 Initial x position (Re)
+0.0	    				 Initial y position (Re)
+0.0     				 Initial z position (Re)
