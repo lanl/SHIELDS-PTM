@@ -462,54 +462,8 @@ contains
   endif
   
   myParticle%drift = .FALSE.
-  
-  contains
-  
-    function fac_rotation_matrix(myParticle) result(R)
-    ! Calculate a matrix that rotates between an "arbitrary" field-aligned coordinate system
-    ! ("PQB") to a Cartesian coordinate system ("XYZ"). PQB is arbitrary in the sense that it
-    ! is not determined through physics, but rather by a simple mathematical prescription that
-    ! relies on the permutation and negation of certain values.
-    !
-    ! P is the "x-like" coordinate
-    ! Q is the "y-like" coordinate
-    ! B is the "z-like" coordinate
-    !
-    ! This is why Q = cross_product(B,P), since y = cross_product(z,x)
-    
-    implicit none
-    
-    type(particle) :: myParticle
-    real(dp), dimension(3,3) :: R
-    real(dp), dimension(3) :: bhat, phat, qhat
-    integer :: imax, imin
-    
-    call get_fields(myParticle,bhat)
-    bhat = bhat/norm(bhat)
-    
-    ! Determine location of smallest and largest components of bhat
-    imax = maxval(maxloc(abs(bhat)))
-    imin = minval(minloc(abs(bhat)))
-    
-    ! Determine first orthogonal unit vector. Negating bhat(imax) is arbitrary, we could also
-    ! negate bhat(imin) and still produce an orthgonal vector.
-    phat = 0.0d0
-    phat(imin) = -bhat(imax)
-    phat(imax) =  bhat(imin)
-    phat = phat/norm(phat)     
-        
-    ! Determine second orthogonal unit vector
-    qhat = cross_product(bhat,phat)
-    qhat = qhat/norm(qhat)
-    
-    ! Populate rotation matrix
-    R(1,:) = phat
-    R(2,:) = qhat
-    R(3,:) = bhat
-    
-    return
-  
-    end function fac_rotation_matrix
+
+  return
   
   end subroutine drift_to_full
 

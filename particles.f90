@@ -128,6 +128,54 @@ contains
 
 !
 
+  function fac_rotation_matrix(myParticle) result(R)
+  ! Calculate a matrix that rotates between an "arbitrary" field-aligned coordinate system
+  ! ("PQB") to a Cartesian coordinate system ("XYZ"). PQB is arbitrary in the sense that it
+  ! is not determined through physics, but rather by a simple mathematical prescription that
+  ! relies on the permutation and negation of certain values.
+  !
+  ! P is the "x-like" coordinate
+  ! Q is the "y-like" coordinate
+  ! B is the "z-like" coordinate
+  !
+  ! This is why Q = cross_product(B,P), since y = cross_product(z,x)
+  
+  implicit none
+  
+  type(particle) :: myParticle
+  real(dp), dimension(3,3) :: R
+  real(dp), dimension(3) :: bhat, phat, qhat
+  integer :: imax, imin
+  
+  call get_fields(myParticle,bhat)
+  bhat = bhat/norm(bhat)
+  
+  ! Determine location of smallest and largest components of bhat
+  imax = maxval(maxloc(abs(bhat)))
+  imin = minval(minloc(abs(bhat)))
+  
+  ! Determine first orthogonal unit vector. Negating bhat(imax) is arbitrary, we could also
+  ! negate bhat(imin) and still produce an orthgonal vector.
+  phat = 0.0d0
+  phat(imin) = -bhat(imax)
+  phat(imax) =  bhat(imin)
+  phat = phat/norm(phat)     
+      
+  ! Determine second orthogonal unit vector
+  qhat = cross_product(bhat,phat)
+  qhat = qhat/norm(qhat)
+  
+  ! Populate rotation matrix
+  R(1,:) = phat
+  R(2,:) = qhat
+  R(3,:) = bhat
+  
+  return
+
+  end function fac_rotation_matrix
+
+!
+
   subroutine particle_initialize(myParticle,tag)
   ! This is an initialization method for the particle data type
   implicit none
@@ -136,7 +184,8 @@ contains
   integer, intent(in), optional :: tag
   real(dp) :: x, y, z
   real(dp) :: vp, vz, v
-  real(dp), dimension(3) :: bvec
+  real(dp), dimension(3) :: bvec, bhat, rhat
+  real(dp), dimension(3,3) :: R
   real(dp) :: gam, phi, dx, dy, dz, dt
   integer :: im, jm, km, lm, iEnergy, iPitchAngle
 
@@ -213,9 +262,6 @@ contains
   myParticle%x(1) = x
   myParticle%x(2) = y
   myParticle%x(3) = z
-  myParticle%v(1) = vp*cos(phi)
-  myParticle%v(2) = vp*sin(phi)
-  myParticle%v(3) = vz
 
   ! Set the particle at the correct time in order to allow for forward and reverse tracing
   myParticle%t = merge(Tlo,Thi,itrace>0)
@@ -236,6 +282,13 @@ contains
 
   ! Call the fields routine to initialize the tricubic coefficients and determine the initial timestep
   call get_fields(myParticle,bvec,doInit=.TRUE.)
+  
+  bhat = bvec/norm(bvec)
+  
+  R = fac_rotation_matrix(myParticle)
+  rhat = matmul(R,[cos(phi),sin(phi),0.0d0])
+  
+  myParticle%v = vz*bhat+vp*rhat
 
   if(istep==2) then ! Longer steps with the adaptive RK method
     myParticle%dt = sign(epsilon_drift/abs(myParticle%p(1)*norm(bvec)),real(itrace,dp))
