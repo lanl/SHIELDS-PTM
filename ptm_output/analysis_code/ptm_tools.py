@@ -3,10 +3,10 @@ This file contains routines used to read in data from the SHIELDS-PTM particle t
 simulation as well as to calculate quantities based on the particle data.
 
 Jesse Woodroffe
-last revised 5/23/2016
+last revised 6/2/2016
 """
 
-from numpy import array,size,sqrt,pi,exp,loadtxt,argwhere,sort,unique,zeros,zeros_like
+from numpy import array,size,sqrt,pi,exp,loadtxt,argwhere,sort,unique,zeros,zeros_like,sin,cos,arctan2,log10,r_
 from scipy import special
 
 def parse_ptm_file(fname):
@@ -67,10 +67,21 @@ def parse_map_file(fname):
   
   return fluxmap
 
-def energy_to_flux(ei,ef,ec,n,mc2=511.0,kind='maxwell',kap=2.5):
+def energy_to_flux(ei,ef,ec,n,mc2=511.0,kind='kappa',kap=2.5):
     """
     Given the particle energy, number density of particles, and characteristic energy of the distribution,
-    calculate the differential energy flux in keV-1 cm-2 s-1 sr-1. All energies should be in keV.
+    calculate the differential energy flux in keV-1 cm-2 s-1 sr-1. 
+    
+    Required Inputs are:
+      Ei    Initial energy (energy in source region) in keV
+      Ef    Final energy (energy at observation point) in keV
+      Ec    Characteristic energy of the distribution in keV
+      n     Density of particles in cm-3
+    
+    Optional inputs are:
+      mc2   Mass energy of the particle species in keV (default is 511 for electrons)
+      kind  Kind of distribution function to use (default is kappa)
+      kap   Power law index for the kappa distribution (default is 2.5)
     
     Jesse Woodroffe
     3/30/2016
@@ -99,3 +110,99 @@ def energy_to_flux(ei,ef,ec,n,mc2=511.0,kind='maxwell',kap=2.5):
 
     return j
         
+def tm03_moments(x,y,swD):
+    """
+    The Tsyganeko and Mukai [2003] plasma sheet model (with corrected equations).
+    
+    Inputs:
+      x     GSM x position in Earth radii
+      y     GSM y position in Earth radii
+      swD   A dictionary with the following keys that must be defined:
+          'bperp' Magnitude of the perpendicular component of the solar wind magnetic field in nT
+          'theta' Solar wind clock angle in degrees
+          'vx'    Solar wind speed in km/s
+          'n'     Solar wind density in cm-3
+          'p'     Solar wind dynamic pressure in nPa
+          
+    Outputs:
+      res   A dictionary with the following keys:
+          'P'   Local pressure in nPa
+          'T'   Local temperature in keV
+          'n'   Local ion/electron density in cm-3
+          
+    Reference:
+    
+    Tsyganeko, N. A. and T. Mukai (2003), Tail plasma sheet models derived from Geotail particle data,
+        J. Geophys. Res., 108(A3),1136, doi:10.1029/2002JA009707
+    
+    Jesse Woodroffe
+    6/2/2016
+    """
+    
+    aT=r_[0,1.678,-0.1606, 1.669, 4.820,  2.855, -0.602, -0.836,-2.491,
+          0.2568,0.2249,0.1887,-0.4458,-0.0331,-0.0241,-2.689, 1.222]
+    aN=r_[0,-0.159,0.608,0.5055,0.0796,0.2746,0.0361,-0.0342,-0.7935,1.162,0.4756,0.7117]
+    aP=r_[0,0.057,0.524,0.0908,0.527,0.078,-4.422,-1.533,
+          -1.217, 2.54, 0.32,  0.754,1.048,-0.074, 1.015]
+    dtor=pi/180.0
+    bperp=swD['bperp']/5
+    bz=swD['bperp']*cos(swD['theta']*dtor)
+    if(bz>0):
+        bzn=bz/5.0
+        bzs=0.0
+    else:
+        bzn=0.0
+        bzs=bz/5.0
+    vsw=swD['vx']/500.0
+    nsw=swD['n']/10.0
+    fsw=bperp*sqrt(sin(swD['theta']*dtor/2))
+    rho=sqrt(x*x+y*y)/10.0
+    psw=swD['p']/3.0
+    phi=-arctan2(y,x)
+    rm1=rho-1.0
+    T=(aT[1]*vsw+aT[2]*bzn+aT[3]*bzs+aT[4]*
+       exp(-(aT[9]*vsw**aT[15]+aT[10]*bzn+aT[11]*bzs)*rm1)+
+       (aT[5]*vsw+aT[6]*bzn+aT[7]*bzs+aT[8]*
+        exp(-(aT[12]*vsw**aT[16]+aT[13]*bzn+aT[14]*bzs)*rm1))*sin(phi)**2)
+    N=((aN[1]+aN[2]*nsw**aN[10]+aN[3]*bzn+aN[4]*vsw*bzs)*rho**aN[8]+
+       (aN[5]*nsw**aN[11]+aN[6]*bzn+aN[7]*vsw*bzs)*rho**aN[9]*sin(phi)**2)
+    P=(aP[1]*rho**aP[6]+aP[2]*psw**aP[11]*rho**aP[7]+aP[3]*fsw**aP[12]*rho**aP[8]+
+       (aP[4]*psw**aP[13]*exp(-aP[9]*rho)+aP[5]*fsw**aP[14]*exp(-aP[10]*rho))*sin(phi)**2)
+       
+    res={'P':P,'T':T,'n':N}
+    
+    return res
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
