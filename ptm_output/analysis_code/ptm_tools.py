@@ -171,38 +171,4 @@ def tm03_moments(x,y,swD):
        
     res={'P':P,'T':T,'n':N}
     
-    return res
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+    return res   
