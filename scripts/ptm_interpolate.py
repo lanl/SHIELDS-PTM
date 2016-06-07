@@ -78,7 +78,7 @@ def gauss_interp_EB(xwant,ywant,zwant,fdict,smoothingDegree=0.5,numNeighbors=24)
       if(missingKeys=='z'): print "\nBased on missing keys, SWMF file may contain only 2D data\n"
     raise Exception('Error in rbf_interp_EB: fdict does not have expected keys: {'+missingKeys.strip()+'}')
     
-	# Check that data file contains the correct components	
+  # Check that data file contains the correct components  
 
   for key in mhdFields:
     if(not fdict.has_key(key)): raise Exception('Error in rbf_interp_EB: requested key {'+key+'} was not present in fdict')
@@ -106,74 +106,74 @@ def gauss_interp_EB(xwant,ywant,zwant,fdict,smoothingDegree=0.5,numNeighbors=24)
   return res
 
 def rbf_interp_EB(xwant,ywant,zwant,fdict,numNeighbors=48,smoothingDegree=0.05,basis='multiquadric'):
-	"""
-	Perform radial basis function interpolation of an irregularly-gridded data set using
-	a K-nearest neighbors approach. This method is considerably	slower (approx 12x) than the IDW 
-	approach in gauss_interp_EB, owing to its need to solve a linear system for each point 
-	being interpolated. Consequently, this cannot be recommended for general use, but it is
-	provided for comparison's sake. An additional issue is that Rbf methods are sensitive to
-	resolution changes, producing a "ringing" effect near these boundaries. To this point, the
-	basis that seems to deal best with these issues is the multiquadric, so this is default.
+  """
+  Perform radial basis function interpolation of an irregularly-gridded data set using
+  a K-nearest neighbors approach. This method is considerably  slower (approx 12x) than the IDW 
+  approach in gauss_interp_EB, owing to its need to solve a linear system for each point 
+  being interpolated. Consequently, this cannot be recommended for general use, but it is
+  provided for comparison's sake. An additional issue is that Rbf methods are sensitive to
+  resolution changes, producing a "ringing" effect near these boundaries. To this point, the
+  basis that seems to deal best with these issues is the multiquadric, so this is default.
 
-	Inputs:
-		xwant   Array of x-positions where values are desired
-		ywant   Array of y-positions where values are desired
-		zwant   Array of z-positions where values are desired
-		fdict   Dictionary containing data from an SWMF object created by IdlFile from spacepy.pybats
+  Inputs:
+    xwant   Array of x-positions where values are desired
+    ywant   Array of y-positions where values are desired
+    zwant   Array of z-positions where values are desired
+    fdict   Dictionary containing data from an SWMF object created by IdlFile from spacepy.pybats
 
-	Optional:
-		numNeighbors      Integer value setting the number of neighbors to use in calculation, default is 48
-		basis             String specifying the Rbf interpolation kernel to be used, default is multiquadric
-		smoothingDegree   Float that determines how closesly input values need to be replicated (0.0=exactly)
-	
-	Jesse Woodroffe
-	6/2/2016
-	"""
-	
-	goodBases=['multiquadric','inverse','thin_plate','gaussian','linear','cubic','quintic']
-	mhdFields=['bx','by','bz','ex','ey','ez']
-	
-	# Check that user is passing three-dimensional data
-	try:
-		myTree = cKDTree(zip(fdict['x'],fdict['y'],fdict['z']))
-	except KeyError:
-		missingKeys=''
-		if(not fdict.has_key('x')): missingKeys+='x '
-		if(not fdict.has_key('y')): missingKeys+='y '
-		if(not fdict.has_key('z')): 
-		  missingKeys+='z'
-		  if(missingKeys=='z'): print "\nBased on missing keys, SWMF file may contain only 2D data\n"
-		raise Exception('Error in rbf_interp_EB: fdict does not have expected keys: {'+missingKeys.strip()+'}')
+  Optional:
+    numNeighbors      Integer value setting the number of neighbors to use in calculation, default is 48
+    basis             String specifying the Rbf interpolation kernel to be used, default is multiquadric
+    smoothingDegree   Float that determines how closesly input values need to be replicated (0.0=exactly)
+  
+  Jesse Woodroffe
+  6/2/2016
+  """
+  
+  goodBases=['multiquadric','inverse','thin_plate','gaussian','linear','cubic','quintic']
+  mhdFields=['bx','by','bz','ex','ey','ez']
+  
+  # Check that user is passing three-dimensional data
+  try:
+    myTree = cKDTree(zip(fdict['x'],fdict['y'],fdict['z']))
+  except KeyError:
+    missingKeys=''
+    if(not fdict.has_key('x')): missingKeys+='x '
+    if(not fdict.has_key('y')): missingKeys+='y '
+    if(not fdict.has_key('z')): 
+      missingKeys+='z'
+      if(missingKeys=='z'): print "\nBased on missing keys, SWMF file may contain only 2D data\n"
+    raise Exception('Error in rbf_interp_EB: fdict does not have expected keys: {'+missingKeys.strip()+'}')
 
-	# Check that requested basis is supported  
-	if(not basis in goodBases):
-		raise Exception('Error in rbf_interp_EB: requested basis ('+basis+') not supported')
+  # Check that requested basis is supported  
+  if(not basis in goodBases):
+    raise Exception('Error in rbf_interp_EB: requested basis ('+basis+') not supported')
 
-	# Check that data file contains the correct components	
-	for key in mhdFields:
-		if(not fdict.has_key(key)): raise Exception('Error in rbf_interp_EB: requested key {'+key+'} was not present in fdict')
-	
-	myTree = cKDTree(zip(fdict['x'],fdict['y'],fdict['z']))
-	Y,X,Z=meshgrid(ywant,xwant,zwant)
-	XR,YR,ZR=X.ravel(),Y.ravel(),Z.ravel()
-	dists,dexes=myTree.query(c_[XR,YR,ZR],numNeighbors)
-	
-	temp={}
-	for key in goodFields:
-		temp[key]=zeros_like(ZR)	
-		for i in xrange(size(ZR)):
-			myRBF = Rbf(fdict['x'][dexes[i,:]],fdict['y'][dexes[i,:]],fdict['z'][dexes[i,:]],fdict[key][dexes[i,:]],smooth=smoothingDegree,function=basis)
-			temp[key][i] = myRBF(XR[i],YR[i],ZR[i])
+  # Check that data file contains the correct components  
+  for key in mhdFields:
+    if(not fdict.has_key(key)): raise Exception('Error in rbf_interp_EB: requested key {'+key+'} was not present in fdict')
+  
+  myTree = cKDTree(zip(fdict['x'],fdict['y'],fdict['z']))
+  Y,X,Z=meshgrid(ywant,xwant,zwant)
+  XR,YR,ZR=X.ravel(),Y.ravel(),Z.ravel()
+  dists,dexes=myTree.query(c_[XR,YR,ZR],numNeighbors)
+  
+  temp={}
+  for key in goodFields:
+    temp[key]=zeros_like(ZR)  
+    for i in xrange(size(ZR)):
+      myRBF = Rbf(fdict['x'][dexes[i,:]],fdict['y'][dexes[i,:]],fdict['z'][dexes[i,:]],fdict[key][dexes[i,:]],smooth=smoothingDegree,function=basis)
+      temp[key][i] = myRBF(XR[i],YR[i],ZR[i])
 
-	res={}
-	res['bx']=temp['bx'].reshape(Z.shape)
-	res['by']=temp['by'].reshape(Z.shape)
-	res['bz']=temp['bz'].reshape(Z.shape)
-	res['ex']=-(temp['uy']*temp['bz']-temp['uz']*temp['by']).reshape(Z.shape)
-	res['ey']=-(temp['uz']*temp['bx']-temp['ux']*temp['bz']).reshape(Z.shape)
-	res['ez']=-(temp['ux']*temp['by']-temp['uy']*temp['bx']).reshape(Z.shape)
+  res={}
+  res['bx']=temp['bx'].reshape(Z.shape)
+  res['by']=temp['by'].reshape(Z.shape)
+  res['bz']=temp['bz'].reshape(Z.shape)
+  res['ex']=-(temp['uy']*temp['bz']-temp['uz']*temp['by']).reshape(Z.shape)
+  res['ey']=-(temp['uz']*temp['bx']-temp['ux']*temp['bz']).reshape(Z.shape)
+  res['ez']=-(temp['ux']*temp['by']-temp['uy']*temp['bx']).reshape(Z.shape)
 
-	return res
+  return res
 
 if __name__ == "__main__":
 
