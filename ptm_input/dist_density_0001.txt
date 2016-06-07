@@ -1,4 +1,4 @@
 1        				 idens
--3.2552	    				 Initial x position (Re)
--3.3238	    				 Initial y position (Re)
-1.8584     				 Initial z position (Re)
+-5.00    				 Initial X position (Re)
+0.00     				 Initial Y position (Re)
+0.00     				 Initial Z position (Re)

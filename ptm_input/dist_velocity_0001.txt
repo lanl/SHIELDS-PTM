@@ -1,4 +1,4 @@
-1        			idist
-10.0				Ekev
-45.0				Alpha
-180.0				PhiDeg (< 0 to use random)
+1        				 idist
+100      				 E(keV)
+90       				 Pitch Angle (deg) 
+180.00   				 Phase Angle

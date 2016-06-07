@@ -19,9 +19,9 @@ Jesse Woodroffe
 from numpy import pi
 
 # Define constants for convenience
-ckm = 2.998e5
-dtor = pi/180.0
-rtod = 180.0/pi
+ckm = 2.998e5 # Speed of light in km/s
+dtor = pi/180.0 # Degrees to radians conversion
+rtod = 180.0/pi # Radians to degrees conversion
 
 def get_default_inputs(ivelocity=1,idensity=1):
   """
