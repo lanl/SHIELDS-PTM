@@ -1,3 +1,4 @@
 1        			idist
-100.0				Ekev
-90.0				Alpha
+10.0				Ekev
+45.0				Alpha
+180.0				PhiDeg (< 0 to use random)

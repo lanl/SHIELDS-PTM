@@ -69,6 +69,15 @@ def get_B_fields(istep,searchDir=''):
     global nx, ny, nz
     global bx, by, bz
 
+    # Handle a couple of special cases
+    if(len(searchDir)>0):
+      if(searchDir=='.'):
+        # User specified pwd using dot; strip the dot 
+        searchDir=''
+      elif(searchDir[-1]!='/'): 
+        # User forgot to add a slash at the end of the directory name; add a slash
+        searchDir+='/'
+
     get_grid(searchDir=searchDir)
       
     bx=fromfile(searchDir+'bx3d_%4.4i.bin' % istep).reshape((nx,ny,nz))
@@ -303,7 +312,7 @@ def trace_magnetic_equator(r0=6.6,ltmin=0.0,ltmax=23.0,nlt=24,dipoleTilt=20.0):
   yeq=zeros_like(xeq)
   zeq=zeros_like(xeq)
   for i,lt in enumerate(ltvec):
-    lat0=dipoleTilt*cos(pi*lt/12.0)
+    lat0=dipoleTilt*cos(pi*lt/12.0)-5*(1-cos(pi*lt/12.0))
     pos = find_field_line(lt,r0,lat0,dlat=1.0,verbose=False)
     xeq[i]=pos[0]
     yeq[i]=pos[1]

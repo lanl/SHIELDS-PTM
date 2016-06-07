@@ -1,19 +1,19 @@
 1        				 RunID this needs to match the 4 digit tag (without leading zeros)
 1        				 Number of particles (value is overridden for dist_velocity::idist==3)
 3        				 Spatial dimensions of the fields, 2 or 3: if 2, NZ is automatically set to 2
-75      				 Number of cells in x-direction
-75      				 Number of cells in y-direction
-75      				 Number of cells in z-direction
+151      				 Number of cells in x-direction
+121      				 Number of cells in y-direction
+91      				 Number of cells in z-direction
 -1       				 Direction of trace, -1 = backwards from end, +1 = forwards from start
 1       				 Index of first data file
 2       				 Index of last data file
-3600.0   				 Cadence of input files (s), if negative get values from tgrid
+1000.0   				 Cadence of input files (s), if negative get values from tgrid
 1.0     				 Cadence of output files (s)
 1        				 Time integrator, 1= RK4, 2= RKSuite
--1        				 Equations to solve: -1 = drift, 0 = switch, 1 = orbit
+1        				 Equations to solve: -1 = drift, 0 = switch, 1 = orbit
 3                                        Gyrophase method: 1 = random; 2 = brute force; 3 = gradb
 32                                       Number of search points for brute force method
--1.0     				 charge in multiples of fundamental
-1.0      				 mass in multiples of electron mass
+1.0     				 charge in multiples of fundamental
+1836.0      				 mass in multiples of electron mass
 0.0      				 lower limit of time integration (s)
-3600.0 					 upper limit of time integration (s)
+1000.0 					 upper limit of time integration (s)

@@ -7,14 +7,15 @@ use interpolation
 
 integer, parameter, private :: irand = 2001
 
-integer :: idist, idens
-real(dp) :: x0, y0, z0, E0, alpha, vtperp, vtpara, vz0, vp0
-real(dp) :: xsMin, xsMax, ysMin, ysMax, zsMin, zsMax, mltMin, mltMax, r0
+integer, private :: idist, idens
+real(dp), private :: x0, y0, z0, E0, alpha, vtperp, vtpara, vz0, vp0
+real(dp), private :: xsMin, xsMax, ysMin, ysMax, zsMin, zsMax, mltMin, mltMax, r0
 
 ! Flux mapping
-integer :: nEnergies, nPitchAngles
-real(dp) :: EkevMin, EkevMax, PitchAngleDegMin, PitchAngleDegMax
-real(dp), dimension(:), allocatable :: pitchAngles, energies
+integer, private :: nEnergies, nPitchAngles
+real(dp), private :: EkevMin, EkevMax, PitchAngleDegMin, PitchAngleDegMax
+real(dp), dimension(:), allocatable, private :: pitchAngles, energies
+real(dp), private :: phi0 ! Initial gyrophase angle in degrees; if phi0 < 0, use random gyrophase.
 
 contains
 
@@ -40,6 +41,7 @@ contains
     case(1) ! Beam
       read(lun,*) E0
       read(lun,*) alpha
+      read(lun,*) phi0
       gam = 1.0+E0/(mass*mc2)
       vt = ckm*sqrt(gam*gam-1)/gam
       vp0 = gam*vt*sind(alpha)
@@ -47,6 +49,7 @@ contains
     case(2) ! Bi-Maxwellian
       read(lun,*) vtperp
       read(lun,*) vtpara
+      read(lun,*) phi0
     case(3) 
       !**** Flux map mode ****
       ! This option overrides the 'nparticles' option from
@@ -54,6 +57,7 @@ contains
       ! of particles necessary to obtain the desired flux map.
       read(lun,*) nEnergies
       read(lun,*) nPitchAngles
+      read(lun,*) phi0
       nparticles = nEnergies*nPitchAngles
       write(*,*) 'FLUX MAP MODE'
       write(*,*) 'NPARTICLES = ', nparticles
@@ -88,19 +92,19 @@ contains
   read(lun,*) idens
   
   select case(idens)
-    case(1) ! All particles start at same position
+    case(1) ! All particles are seeded at same position
       read(lun,*) x0
       read(lun,*) y0
       read(lun,*) z0
       write(*,'(a20,3f8.3)') 'x0,y0,z0=', x0, y0, z0
-    case(2) ! Particles are seeded randomly throughout a rectangular region
+    case(2) ! Particles are seeded randomly throughout a cubic region
       read(lun,*) xsMin
       read(lun,*) xsMax
       read(lun,*) ysMin
       read(lun,*) ysMax
       read(lun,*) zsMin
       read(lun,*) zsMax
-    case(3) ! Particles are randomly seeded at a given radial distance
+    case(3) ! Particles are seeded randomly at a given radial distance
       read(lun,*) r0
       read(lun,*) mltMin
       read(lun,*) mltMax
@@ -166,9 +170,9 @@ contains
   qhat = qhat/norm(qhat)
   
   ! Populate rotation matrix
-  R(1,:) = phat
-  R(2,:) = qhat
-  R(3,:) = bhat
+  R(:,1) = phat
+  R(:,2) = qhat
+  R(:,3) = bhat
   
   return
 
@@ -249,7 +253,8 @@ contains
       call assert(.FALSE.,'particle_initialize','idist='//int2str(idist)//' not supported')
   end select
 
-  phi = 2*pi*random_uniform()
+  ! Seed gyrophase as appropriate
+  phi = merge(dtor*phi0,twopi*random_uniform(),phi0>0.0d0)
   gam = sqrt(1.d0+(vp**2+vz**2)/csq)
 
   if(ndim==2) vz = 0.d0 ! Just in case of roundoff error
@@ -284,10 +289,11 @@ contains
   call get_fields(myParticle,bvec,doInit=.TRUE.)
   
   bhat = bvec/norm(bvec)
-  
+   
   R = fac_rotation_matrix(myParticle)
   rhat = matmul(R,[cos(phi),sin(phi),0.0d0])
   
+  ! Initialize particle velocity in Cartesian coordinates
   myParticle%v = vz*bhat+vp*rhat
 
   if(istep==2) then ! Longer steps with the adaptive RK method
