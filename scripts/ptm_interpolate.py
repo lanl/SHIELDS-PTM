@@ -79,6 +79,7 @@ def gauss_interp_EB(xwant,ywant,zwant,fdict,smoothingDegree=0.5,numNeighbors=24)
     raise Exception('Error in rbf_interp_EB: fdict does not have expected keys: {'+missingKeys.strip()+'}')
     
 	# Check that data file contains the correct components	
+
   for key in mhdFields:
     if(not fdict.has_key(key)): raise Exception('Error in rbf_interp_EB: requested key {'+key+'} was not present in fdict')
     
