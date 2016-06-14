@@ -72,16 +72,33 @@ def energy_to_flux(ei,ef,ec,n,mc2=511.0,kind='kappa',kap=2.5):
     Given the particle energy, number density of particles, and characteristic energy of the distribution,
     calculate the differential energy flux in keV-1 cm-2 s-1 sr-1. 
     
+    If you are performing backwards tracing from GEO to some point in the tail, Ei is the energy in the tail
+    and Ef is the energy at GEO.
+    
     Required Inputs are:
       Ei    Initial energy (energy in source region) in keV
       Ef    Final energy (energy at observation point) in keV
-      Ec    Characteristic energy of the distribution in keV
+      Ec    Characteristic energy of the distribution in keV (analogous to temperature)
       n     Density of particles in cm-3
     
     Optional inputs are:
       mc2   Mass energy of the particle species in keV (default is 511 for electrons)
       kind  Kind of distribution function to use (default is kappa)
       kap   Power law index for the kappa distribution (default is 2.5)
+    
+    The default value of kappa corresponds to electrons in a fairly strong substorm. For other species and
+    levels of activity, Gabrielse et al. [2014] provided a table of values for kappa, derived from THEMIS
+    observations:
+    
+      |AL|    ions    electrons
+      min     5.1     2.7
+      int     4.6     2.7
+      max     4.4     2.5
+    
+    Values of n and Ec need to be obtained from some sort of tail plasma model, either kinetic or
+    MHD (in which case Ec~P/rho). It is also important to remember that electron temperature usually
+    differs from ion temperature, up to a factor of 7 different. It is up to the user to make sure
+    that the correct temperature for the desired species is provided.
     
     Jesse Woodroffe
     3/30/2016
@@ -134,6 +151,8 @@ def tm03_moments(x,y,swD):
     
     Tsyganeko, N. A. and T. Mukai (2003), Tail plasma sheet models derived from Geotail particle data,
         J. Geophys. Res., 108(A3),1136, doi:10.1029/2002JA009707
+    
+    The output from the TM03 model can be used to set n and Ec inputs to the energy_to_flux routine.
     
     Jesse Woodroffe
     6/2/2016
