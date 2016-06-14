@@ -83,7 +83,9 @@ def energy_to_flux(ei,ef,ec,n,mc2=511.0,kind='kappa',kap=2.5):
     
     Optional inputs are:
       mc2   Mass energy of the particle species in keV (default is 511 for electrons)
-      kind  Kind of distribution function to use (default is kappa)
+      kind  Kind of distribution function to use
+            'kappa'     kappa distribution in energy
+            'maxwell'   relativistic Maxwell-Juttner distribution
       kap   Power law index for the kappa distribution (default is 2.5)
     
     The default value of kappa corresponds to electrons in a fairly strong substorm. For other species and
@@ -113,15 +115,18 @@ def energy_to_flux(ei,ef,ec,n,mc2=511.0,kind='kappa',kap=2.5):
     v=ckm*sqrt(gamf*gamf-1.0)/gamf
     
     if(kind=='maxwell'):
-        f0=n*pi**-1.5
-        f=f0*exp(-(u/w)**2)/w**3
+      # Maxwell-Juttner distribution
+      Q=ec/mc2
+      f0=n/(4*pi*ckm**3*Q*special.kn(2,1.0/Q))
+      f=f0*exp(-gami/Q)
     elif(kind=='kappa'):
-        wki=w*sqrt((2*kap-3.0)/kap)
-        f0=n/(2*pi)*(kap*wki**2)**-1.5*special.gamma(kap+1)/(special.gamma(kap-0.5)*special.gamma(1.5))
-        f=f0*(1+(u/wki)**2/kap)**-(kap+1)
+      # Kappa distribution
+      Wc=ec*(1.0-1.5/kap)
+      wkc=gamc*w
+      f0=n*(2*pi*kap*wkc*wkc)**-1.5*(special.gamma(kap+1)/special.gamma(kap-0.5))
+      f=f0*(1+ei/(kap*Wc))**-(kap+1)
     else:
-        f0=n*pi**-1.5
-        f=f0*exp(-(u/w)**2)/w**3
+      raise Exception('Error in energy_to_flux: kind= '+kind+' is not supported')
 
     j=1e5*ckm*ckm*v*v/mc2*f
 
