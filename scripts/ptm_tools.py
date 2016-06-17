@@ -6,8 +6,11 @@ Jesse Woodroffe
 last revised 6/2/2016
 """
 
-from numpy import array,size,sqrt,pi,exp,loadtxt,argwhere,sort,unique,zeros,zeros_like,sin,cos,arctan2,log10,r_
+from numpy import array,size,sqrt,pi,exp,loadtxt,argwhere,sort,unique,zeros,zeros_like,sin,cos,arctan2,log10,r_,diff,dot,allclose
 from scipy import special
+
+__dtor=pi/180.0
+__rtod=180.0/pi
 
 def parse_ptm_file(fname):
     """
@@ -122,8 +125,7 @@ def energy_to_flux(ei,ef,ec,n,mc2=511.0,kind='kappa',kap=2.5):
     elif(kind=='kappa'):
       # Kappa distribution
       Wc=ec*(1.0-1.5/kap)
-      wkc=gamc*w
-      f0=n*(2*pi*kap*wkc*wkc)**-1.5*(special.gamma(kap+1)/special.gamma(kap-0.5))
+      f0=n*(mc2/(ckm*ckm*Wc*2*pi*kap))**1.5*(special.gamma(kap+1)/special.gamma(kap-0.5))
       f=f0*(1+ei/(kap*Wc))**-(kap+1)
     else:
       raise Exception('Error in energy_to_flux: kind= '+kind+' is not supported')
@@ -131,7 +133,54 @@ def energy_to_flux(ei,ef,ec,n,mc2=511.0,kind='kappa',kap=2.5):
     j=1e5*ckm*ckm*v*v/mc2*f
 
     return j
-        
+    
+def calculate_omnidirectional_flux(pav,diffJ,angleDegrees=True):
+    """
+    Calculate the omnidirectional flux given differential flux. This assumes that the pitch
+    angle bins are evenly spaced. Non-uniform bins are not currently supported.
+    
+    j_omni(E) = int_0^pi int_0^2pi dphi sinQ dQ j_diff(Q,phi,E)
+              = 2pi int_0^pi dQ sinQ j_diff(Q,E)
+              
+
+    Inputs:
+      pav           1D array of floats   Vector containing pitch angles for each flux value
+      diffJ         2D array of floats   Array containg differential fluxes j(a,E)
+      angleDegrees  logical,optional     Indicates if pitch angles are in degrees (True) or 
+                                         radians (set to False). Default is True.
+    
+    Outputs:
+      omni          1D array of floats   Vector containing omnidirectional fluxes at each energy.
+
+    Jesse Woodroffe
+    6/17/2016
+    """
+    
+    diffQ = diff(pav)
+    dQ=diffQ[0]
+
+    if(not allclose(diffQ,dQ)):
+        raise Exception('Error in calculate_omnidirectional_flux: Nonuniform PA distribution not supported')
+    
+    if(angleDegrees):
+        dQ*= __dtor
+        sinQ = sin(__dtor*pav)
+    else:
+        sinQ = sin(pav)
+    
+    # Check if dimensions agree for reduction
+    if(size(pav)==size(diffJ,0)): 
+        # Good
+        omniJ = 2*pi*dQ*dot(sinQ,diffJ)
+    elif(size(pav)==size(diffJ,1)): 
+        # Need to transpose fluxes
+        omniJ = 2*pi*dQ*dot(sinQ,diffJ.T)
+    else: 
+        # Can't reconcile operations, the dimensions don't agreee
+        raise Exception('Error in calculate_omnidirectional_flux: Dimension mismatch between PAV and DIFFJ')
+    
+    return omniJ
+  
 def tm03_moments(x,y,swD):
     """
     The Tsyganeko and Mukai [2003] plasma sheet model (with corrected equations).
