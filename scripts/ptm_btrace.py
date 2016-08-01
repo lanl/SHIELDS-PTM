@@ -22,17 +22,18 @@ Public Methods (see individual methods for documentation)
 
 EXAMPLE USAGE
 
-bfield=gridded_magnetic_field(istep=240,searchdir='/Users/jwoodroffe/Desktop/substorm_gridded/')
+import ptm_btrace as bt
+bfield=bt.gridded_magnetic_field(istep=360,searchdir='/Users/jwoodroffe/Workspace/Projects/PTM/Events/7-18-2013/gridded/')
 mageq=bfield.trace_magnetic_equator(6.6)
 
 Jesse Woodroffe
 6/28/2016
 """
 
-from numpy import fromfile,pi,cos,sin,zeros,zeros_like,r_,c_,abs,linspace,size,argmin,dot,arccos,arctan2
+from numpy import fromfile,pi,cos,sin,zeros,zeros_like,r_,c_,abs,linspace,size,argmin,dot,arcsin,arctan2,arange,vstack,array,sign,sqrt
 from numpy.linalg import norm
-from scipy.optimize import fsolve
-from scipy.integrate import ode
+from scipy.optimize import newton
+from scipy.integrate import ode,odeint
 from scipy.interpolate import RegularGridInterpolator
 
 dtor = pi/180.0
@@ -86,9 +87,19 @@ class gridded_magnetic_field(object):
     byi=RegularGridInterpolator((self.__xgrid,self.__ygrid,self.__zgrid),self.__by)
     bzi=RegularGridInterpolator((self.__xgrid,self.__ygrid,self.__zgrid),self.__bz)
     
-    def get_bhat(s,xv):
+    def bhat_ode(s,xv):
       bhat=r_[bxi(xv),byi(xv),bzi(xv)]
       bhat/=norm(bhat)
+      return bhat
+
+    def bhat_odeint(xv,s):
+      bhat=r_[bxi(xv),byi(xv),bzi(xv)]
+      bhat/=norm(bhat)
+      return bhat
+        
+    def get_bhat(xv):
+      bhat=r_[bxi(xv),byi(xv),bzi(xv)]
+      bhat/=norm(bvec)
       return bhat
         
     def get_bvec(xv):
@@ -99,9 +110,12 @@ class gridded_magnetic_field(object):
       res=norm(r_[bxi(xv),byi(xv),bzi(xv)])
       return res   
 
+    # Create persistent methods
     self.get_bhat = get_bhat
     self.get_bvec = get_bvec
     self.get_bmag = get_bmag
+    self.__bhat_ode = bhat_ode
+    self.__bhat_odeint = bhat_odeint
 
   def __mlt_to_phi(self,myMlt):
     # Convert from magnetic local time in hours to azimuthal angle in degrees 
@@ -120,57 +134,7 @@ class gridded_magnetic_field(object):
     if(mlt >= 24.0): mlt-=24
     
     return mlt
-    
-  def __find_tilt_axis(self,mlt=0.0,rad=4.0,lat=0.0):
-    """
-    Determine the local dipole tilt angles. That is, determine what the azimuthal and
-    latitudinal angles are for the dipole magnetic moment based on the local fields. This is
-    less accurate the further away you get from the dipole field. This routine is based on a
-    simple vector algebra analysis of the general equation for a magnetic dipole.
-    
-    Input:
-      mlt     float     optional    Magnetic local time in hours where evaluation should occur
-      rad     float     optional    Radial distance in Earth radii where evaluation should occur
-      lat     float     optional    Magnetic latitude in degrees where evaluation should occur
       
-    Output
-      tilt    float   Dipole tilt angle
-      azim    float   Dipole azimuth angle
-      mmag    float   Magnitude of the dipole magnetic moment
-      
-    If the field is a pure dipole, then the results of this routine should be independent of
-    position. However, for a distorted field as is found in SWMF, this is probably not the case.
-    
-    Jesse Woodroffe
-    6/27/2016
-    """
-    
-    phi=self.__mlt_to_phi(mlt)
-    x0=rad*cos(dtor*phi)*cos(dtor*lat)
-    y0=rad*sin(dtor*phi)*cos(dtor*lat)
-    z0=rad*sin(dtor*lat)
-    pos=r_[x0,y0,z0]
-    bvec=self.get_bvec(pos)
-    r=norm(pos)
-    
-    rhat=pos/norm(pos)
-    brad=dot(rhat,bvec)
-    bhat=bvec/norm(bvec)
-    bmag=norm(bvec)
-    bsqr=bmag*bmag
-    
-    mpara=(1.5*brad**2-bsqr)/bmag
-    mperp=1.5*brad*(bsqr*rhat-brad*bvec)/bsqr
-    mtot=mperp+mpara*bhat
-    mmag=norm(mtot)
-    mhat=mtot/mmag
-
-    tilt = rtod*arccos(mhat[2])
-    azim = rtod*arctan2(mhat[1],mhat[0])
-    mlt = self.__phi_to_mlt(azim)
-
-    return tilt,azim,mmag*r**3
-    
   def configure_reader(self,istep=None,searchdir=None):
     """
     Change data source
@@ -178,47 +142,40 @@ class gridded_magnetic_field(object):
     
     self.__init__(istep,searchdir)
    
-  def find_min_B(self,mlt,rad,lat,ds=0.05):
+  def trace_field_line_section(self,mlt,rad,lat,ds=0.05,smax=2.0):
     """
-    Locate the position of minimum magnetic field along a given
-    magnetic field line.
+    Given a point in MLT, radial distance, latitude space, trace a section of the
+    corresponding field line to a distance +-smax.
     
-    Jesse Woodroffe
-    6/28/2016
+    Jesse Woodroffe 
+    7/27/2016  
     """
-    xt,yt,zt,bt,stot=self.trace_field_line(mlt,rad,lat,ds=ds)
-    imin=argmin(bt)
-    pos=r_[xt[imin],yt[imin],zt[imin]]
-    return pos
-    
-  def find_field_line(self,mlt,r0,lat,ds=0.05):
-    """
-    Find the magnetic field line that has minimum B at a given radial distance and
-    magnetic local time.
-    
-    Jesse Woodroffe
-    6/28/2016
-    """
-    
-    def rtfun(x):
-      pos=self.find_min_B(mlt,r0,x,ds=ds)
-      rval=norm(pos)
-      sol=rval-r0
-      return sol
+  
+    phi=self.__mlt_to_phi(mlt)
+    x0=rad*cos(dtor*phi)*cos(dtor*lat)
+    y0=rad*sin(dtor*phi)*cos(dtor*lat)
+    z0=rad*sin(dtor*lat)
 
-    minlat=fsolve(rtfun,lat,xtol=1e-3)
-    
-    pos = self.find_min_B(mlt,r0,minlat,ds=ds)
-    
-    return pos
+    swant=arange(0.0,smax,ds)
+    ics=r_[x0,y0,z0]
 
+    yplus=odeint(self.__bhat_odeint,ics,swant)
+    yminus=odeint(self.__bhat_odeint,ics,-swant)
+    
+    y=vstack([yminus[::-1,:],yplus[1:,:]])
+    
+    bt = array([self.get_bmag(y[i,:]) for i in enumerate(y[:,0])])
+  
+    return y[:,0], y[:,1], y[:,2], bt
+   
   def trace_field_line(self,mlt,rad,lat,ds=0.05,istep_max=100000):
     """
     Given a point in MLT, radial distance, latitude space, trace the corresponding
     magnetic field line to both ionospheres. Also determines the total length of the
     field line which may be useful e.g. in determining resonant frequencies.
   
-    Jesse Woodroffe 5/18/16
+    Jesse Woodroffe 
+    5/18/16
     """
   
     phi=self.__mlt_to_phi(mlt)
@@ -233,9 +190,9 @@ class gridded_magnetic_field(object):
     xm=zeros_like(xp)
     ym=zeros_like(xp)
     zm=zeros_like(xp)
-    bm=zeros_like(xp)
+    bm=zeros_like(xp)    
   
-    r=ode(self.get_bhat).set_integrator('vode',method='adams')
+    r=ode(self.__bhat_ode).set_integrator('vode',method='adams')
   
     stot = 0.0
   
@@ -332,14 +289,157 @@ class gridded_magnetic_field(object):
 
     return xr,yr,zr,br,stot
    
-  def trace_magnetic_equator(self,r0,ltmin=0.0,ltmax=23.0,nlt=24,ds=0.05):
+  def find_min_B(self,mlt,rad,lat,ds=0.05):
+    """
+    Locate the position of minimum magnetic field along a given
+    magnetic field line.
+    
+    Jesse Woodroffe
+    6/28/2016
+    """
+    xt,yt,zt,bt,stot=self.trace_field_line(mlt,rad,lat,ds=ds)
+    imin=argmin(bt)
+    pos=r_[xt[imin],yt[imin],zt[imin]]
+    return pos
+  
+  def __find_min_B_root(self,mlt,rad,lat,ds=0.05,smax=1.0):
+
+    xt,yt,zt,bt=self.trace_field_line_section(mlt,rad,lat,ds=ds)
+    imin=argmin(bt)
+    pos=r_[xt[imin],yt[imin],zt[imin]]
+    return pos
+  
+  def __find_field_line_root(self,mlt,r0,lat,ds=0.05,smax=1.0):
+    """
+    Find the magnetic field line that has minimum B at a given radial distance and
+    magnetic local time.
+    
+    Jesse Woodroffe
+    6/28/2016
+    """
+    
+    def rtfun(x):
+      pos=self.__find_min_B_root(mlt,r0,x,ds=ds,smax=smax)
+      rval=norm(pos)
+      sol=rval-r0
+      return sol
+
+    minlat=newton(rtfun,lat,tol=1e-3)
+    
+    phi = self.__mlt_to_phi(mlt)
+    x = r0*cos(dtor*minlat)*cos(dtor*phi)
+    y = r0*cos(dtor*minlat)*sin(dtor*phi)
+    z = r0*sin(dtor*minlat)
+
+    pos = r_[x,y,z]   
+    return pos
+   
+  def __find_field_line_arc(self,r0,mlt,arcSize=15.0,numpts=100,rlev=2,smplane=False):
+    """
+    Find the location of minimum B along an arc at a given radial distance and magnetic local time.
+    For simple magnetic geometries, this locates the minimum-B field line. For more complicated sitatuions,
+    this provides a good guess for the more exhaustive __find_field_line_root. The combination of these
+    two functionalities is provided by the general find_field_line routine below.
+    
+    Jesse Woodroffe
+    7/27/2016
+    """
+   
+    # Get initial guess from dipole approximation
+    lat0,phi=self.__dipole_eq(mlt,r0)
+ 
+    if not smplane: # Improve by searching along arc
+
+      # Intial bounds for arc search
+      lmin=lat0-arcSize
+      lmax=lat0+arcSize
+
+      for ilev in xrange(rlev):
+    
+        # Parameterize the arc
+        latv=dtor*linspace(lmin,lmax,numpts)  
+      
+        xv=r0*cos(latv)*cos(dtor*phi)
+        yv=r0*cos(latv)*sin(dtor*phi)
+        zv=r0*sin(latv)
+      
+        bmat=zeros([latv.size,4])
+      
+        # Calculate magnetic field magnitudes along the arc
+        for i in xrange(latv.size):
+          bmat[i,:3]=self.get_bvec(r_[xv[i],yv[i],zv[i]])
+          bmat[i, 3]=norm(bmat[i,:3])
+        
+        # Refine bracketing
+        imin=argmin(bmat[:,-1])
+        isub=imin-2 if imin>2 else 0
+        iadd=imin+2 if imin<numpts-3 else numpts-1
+        lmin=rtod*latv[isub]
+        lmax=rtod*latv[iadd]
+
+      xr,yr,zr = xv[imin], yv[imin], zv[imin]
+
+    else:
+      
+      xr=r0*cos(dtor*lat0)*cos(dtor*phi)
+      yr=r0*cos(dtor*lat0)*sin(dtor*phi)
+      zr=r0*sin(dtor*lat0)
+    
+    return xr, yr, zr
+  
+  def __dipole_eq(self,mlt,r):
+    """
+    Determine the location of the specified point on the dipole magnetic equator.
+        
+    Jesse Woodroffe
+    7/28/2016
+    """
+    
+    # Calculate the magnetic moment vector
+    bvec=self.get_bvec(r_[3.0,0.0,0.0])
+    rhat=r_[1.0,0.0,0.0]
+    mvec=1.5*dot(rhat,bvec)*rhat-bvec
+    
+    # Determine the planar coefficients for the magnetic equator
+    mhat=mvec/norm(mvec)   
+    a=mhat[0]
+    b=mhat[1]
+    c=mhat[2]
+    
+    # Determine the location by enforcing planar and fixed distance constraints
+    phi = self.__mlt_to_phi(mlt)*dtor
+    rho=r*abs(c)/sqrt((a*cos(phi)+b*sin(phi))**2+c**2)
+    x=rho*cos(phi)
+    y=rho*sin(phi)
+    z=r*(a*cos(phi)+b*sin(phi))/sqrt((a*cos(phi)+b*sin(phi))**2+c**2)
+  
+    # Return the data
+    lat=arcsin(z/r)*rtod
+    azm=phi*rtod
+
+    return lat,azm
+  
+  def find_field_line(self,r0,mlt,arcSize=15.0,numpts=100.0,rlev=2,smplane=False,refine=False,refine_ds=0.05,smax=1.0):
+    """
+    Locate a specified field line using an arc-based B-minimizer and rootfinding based optimizer to refine.
+    
+    Jesse Woodroffe
+    7/27/2016
+    """
+    pos=self.__find_field_line_arc(r0,mlt,arcSize=arcSize,numpts=numpts,rlev=rlev,smplane=smplane)
+    if(refine):
+      lat=rtod*arcsin(pos[2]/norm(pos))
+      try:
+        pos=self.__find_field_line_root(mlt,r0,lat,ds=refine_ds,smax=smax)
+      except: # Occasionally higher resolution is required to get a convergent solution
+        pos=self.__find_field_line_root(mlt,r0,lat,ds=0.01,smax=smax)
+    return pos
+    
+  def trace_magnetic_equator(self,r0,ltmin=0.0,ltmax=23.0,nlt=24,ds=0.05,refine=False,smplane=False):
     """
     Find all points at a given radial distance in the magnetic equator for a selected set of
     magnetic local times.
 
-    Parallelization of this routine could produce speedup, but there are inherent difficulties in using
-    the multiprocessing library (it won't pickle methods)
-    
     Jesse Woodroffe
     6/28/2016
     """
@@ -348,16 +448,11 @@ class gridded_magnetic_field(object):
     xeq=zeros([nlt])
     yeq=zeros_like(xeq)
     zeq=zeros_like(xeq)
-    dipoleTilt,azim,mag=self.__find_tilt_axis()
     for i,lt in enumerate(ltvec):
-      phi=self.__mlt_to_phi(lt)
-      if(dipoleTilt<90.0):
-        lat0=dipoleTilt*cos(dtor*(phi-180.0))
-      else:
-        lat0=(180.0-dipoleTilt)*cos(dtor*(phi-180.0))
-      pos = self.find_field_line(lt,r0,lat0,ds=ds)
+      pos = self.find_field_line(r0,lt,refine_ds=ds,refine=refine,smplane=smplane)
       xeq[i]=pos[0]
       yeq[i]=pos[1]
       zeq[i]=pos[2]
     
     return c_[xeq,yeq,zeq]
+    
