@@ -68,6 +68,9 @@ real(dp) :: mass
 real(dp) :: charge_mass_ratio
 real(dp) :: tlo
 real(dp) :: thi
+real(dp) :: xsource
+
+logical :: fluxMap = .FALSE.
 
 ! Gyrophase calculation parameters
 real(dp) :: dphi

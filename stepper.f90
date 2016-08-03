@@ -218,6 +218,12 @@ contains
       if(myParticle%t+myParticle%dt < tnext) exit
     endif
 
+    ! If tracing particle fluxes, terminate integration when it reaches specified boundary
+    if(fluxMap .and. myParticle%x(1) <= xsource) then
+      myParticle%integrate = .FALSE.
+      exit
+    endif
+    
   enddo
 
   ! Clean up integration

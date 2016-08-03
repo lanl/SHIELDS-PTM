@@ -55,6 +55,9 @@ contains
       ! This option overrides the 'nparticles' option from
       ! the ptm_parameters.txt file and sets it to the number
       ! of particles necessary to obtain the desired flux map.
+      
+      fluxMap = .TRUE.
+      
       read(lun,*) nEnergies
       read(lun,*) nPitchAngles
       read(lun,*) phi0
@@ -79,6 +82,8 @@ contains
       else
         pitchAngles = linspace(PitchAngleDegMin,PitchAngleDegMax,nPitchAngles)
       endif
+      
+      read(lun,*) xsource
       
     case default
       call assert(.FALSE.,'particles_initialize','idist='//int2str(idist)//' not supported')
