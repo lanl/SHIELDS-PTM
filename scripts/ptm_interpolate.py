@@ -81,7 +81,7 @@ def gauss_interp_EB(xwant,ywant,zwant,fdict,smoothingDegree=0.5,numNeighbors=24)
   # Check that data file contains the correct components  
 
   for key in mhdFields:
-    if(not fdict.has_key(key)): raise Exception('Error in rbf_interp_EB: requested key {'+key+'} was not present in fdict')
+    if(not fdict.has_key(key)): raise Exception('Error in gauss_interp_EB: requested key {'+key+'} was not present in fdict')
     
   Y,X,Z=meshgrid(ywant,xwant,zwant)
   dists,dexes=myTree.query(c_[X.ravel(),Y.ravel(),Z.ravel()],numNeighbors)

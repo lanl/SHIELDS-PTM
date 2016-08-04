@@ -41,7 +41,7 @@ global nx, ny, nz
 global xgrid, ygrid, zgrid
 global bx, by, bz
 
-def get_grid(searchDir=''):
+def __get_grid(searchDir=''):
   """
   The searchDir argument specifies which directory to look in for grid files
   """
@@ -78,7 +78,7 @@ def get_B_fields(istep,searchDir=''):
         # User forgot to add a slash at the end of the directory name; add a slash
         searchDir+='/'
 
-    get_grid(searchDir=searchDir)
+    __get_grid(searchDir=searchDir)
       
     bx=fromfile(searchDir+'bx3d_%4.4i.bin' % istep).reshape((nx,ny,nz))
     by=fromfile(searchDir+'by3d_%4.4i.bin' % istep).reshape((nx,ny,nz))

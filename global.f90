@@ -45,11 +45,13 @@ integer :: nphase
 integer :: itrace
 integer :: iFirst
 integer :: iLast
+integer :: ntot
 integer :: nx
 integer :: ny
 integer :: nz
 integer :: nt
 integer :: nparticles
+integer :: itraj
 
 character(len=4) :: id_string
 

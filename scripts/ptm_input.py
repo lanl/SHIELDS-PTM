@@ -101,6 +101,7 @@ def get_default_inputs(ivelocity=1,idensity=1):
   pdict['itrace']=-1      # 1 = forward in time, -1 = backwards in time
   pdict['ifirst']=1       # Timestep of first fields snapshot: e.g., start at bx3d_0005.bin if ifirst=5
   pdict['ilast']=2        # Timestep of last fields snapshot: e.g., finish at bx3d_0009.bin if ilast=9
+  pdict['ntot']=2         # Total number of time steps in tgrid file
   pdict['dtin']=3600.0    # Time between snapshots (seconds). If dtin<0, read times from tgrid.bin
   pdict['dtout']=1.0      # Time between data outputs (seconds)
   pdict['istep']=1        # Integrator to use: 1=RK4, 2=Adaptive RKSuite
@@ -111,6 +112,7 @@ def get_default_inputs(ivelocity=1,idensity=1):
   pdict['mass']=1.0       # Particle mass in multiples of the electron mass
   pdict['tlo']=0.0        # Lowest time of particle trace
   pdict['thi']=3600.0     # Highest time of particle trace
+  pdict['itraj']=0    # Write particle trajectories if in flux map mode: 0 = no, 1 = yes
   
   # Default parameters for velocity file
   vdict={}
@@ -224,6 +226,7 @@ def create_input_files(pd,filedir=''):
   pfile.write('%-8i \t\t\t\t Direction of trace, -1 = backwards from end, +1 = forwards from start\n' % pd['p']['itrace'])
   pfile.write('%-8i \t\t\t\t Index of first data file\n' % pd['p']['ifirst'])
   pfile.write('%-8i \t\t\t\t Index of last data file\n' % pd['p']['ilast'])
+  pfile.write('%-8i \t\t\t\t Total number of timesteps in tgrid\n' % pd['p']['ntot'])  
   pfile.write('%-8.1f \t\t\t\t Cadence of input files (s), if negative get values from tgrid\n' %pd['p']['dtin'])
   pfile.write('%-8.1f \t\t\t\t Cadence of output files (s)\n' % pd['p']['dtout'])
   pfile.write('%-8i \t\t\t\t Time integrator, 1= RK4, 2= RKSuite\n' % pd['p']['istep'])
@@ -234,6 +237,7 @@ def create_input_files(pd,filedir=''):
   pfile.write('%-8.1f \t\t\t\t mass in multiples of electron mass\n' % pd['p']['mass'])
   pfile.write('%-8.1f \t\t\t\t lower limit of time integration (s)\n' % pd['p']['tlo'])
   pfile.write('%-8.1f \t\t\t\t upper limit of time integration (s)\n' % pd['p']['thi'])
+  pfile.write('%-8i \t\t\t\t write particle trajectories in flux map mode' % pd['p']['itraj'])
   pfile.close()
 
   # Write the density file, dist_density_xxxx.dat

@@ -26,7 +26,7 @@ contains
   character(len=22) :: dfile
 
   ! Allocate storage for global arrays
-  allocate(xgrid(nx),ygrid(ny),tgrid(nt))
+  allocate(xgrid(nx),ygrid(ny))
 
   if(ndim==2) then
     allocate(zgrid(2))
@@ -37,6 +37,8 @@ contains
     allocate(BX3D(nt,nx,ny,nz),BY3D(nt,nx,ny,nz),BZ3D(nt,nx,ny,nz))
     allocate(EX3D(nt,nx,ny,nz),EY3D(nt,nx,ny,nz),EZ3D(nt,nx,ny,nz))
   endif
+
+  allocate(tgrid(ntot))
 
   ! Read data files files
   call read_array('ptm_data/xgrid.bin',xgrid)
@@ -62,17 +64,6 @@ contains
 
     TMin = minval(tgrid)
     TMax = maxval(tgrid)
-
-!--
-! NOT SURE WHAT THIS CODE WAS EVER HERE FOR
-!--
-!    if(tlo == thi) then
-!      TMin = minval(tgrid)
-!      TMax = maxval(tgrid)
-!    else
-!      TMin = tlo
-!      TMax = thi
-!    endif
 
   endif
 

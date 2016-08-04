@@ -46,12 +46,14 @@ do n=1,nparticles
     if(.not. myParticle%integrate) exit
   enddo
 !$omp critical
-  if(iwrite < nwrite) then 
-    ! Particle encountered a boundary and kicked out early
-    call writeDataStore(particleData(:iwrite,:))
-  else 
-    ! Successful execution of all timesteps
-    call writeDataStore(particleData)
+  if((.not. fluxMap) .or. itraj==1) then
+    if(iwrite < nwrite) then 
+      ! Particle encountered a boundary and kicked out early
+      call writeDataStore(particleData(:iwrite,:))
+    else 
+      ! Successful execution of all timesteps
+      call writeDataStore(particleData)
+    endif
   endif
   call writeFluxCoordinates(myParticle)
 !$omp end critical

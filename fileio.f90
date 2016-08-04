@@ -37,6 +37,7 @@ contains
   read(lun,*) itrace
   read(lun,*) ifirst
   read(lun,*) ilast
+  read(lun,*) ntot
   read(lun,*) dtIn
   read(lun,*) dtOut
   read(lun,*) istep
@@ -47,6 +48,7 @@ contains
   read(lun,*) mass
   read(lun,*) tlo
   read(lun,*) thi
+  read(lun,*) itraj
 
   ! Gyrophase switching. dphi is defined in the GLOBAL module
   call assert(nphase > 0,'read_ptm_parameters','nphase must be greater than zero.')
