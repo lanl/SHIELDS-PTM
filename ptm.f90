@@ -75,9 +75,9 @@ contains
   implicit none
 
   integer :: argnum, arglen, argstat
-  character(len=3) :: argstr
+  character(len=4) :: argstr
   argnum = 1
-  arglen = 3
+  arglen = 4
   call get_command_argument(argnum,argstr,arglen,argstat)
 
   id_string = repeat('0',4-len(trim(argstr)))//trim(argstr)
