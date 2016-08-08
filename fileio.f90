@@ -158,7 +158,7 @@ contains
 
   subroutine writeFluxCoordinates(myParticle)
   ! This program writes out a simple set of flux mapping coordinates that can be used to apply Liouville's
-  ! theorem for calculating particle fluxes
+  ! theorem for calculating particle fluxes. Output file contains time initialized, 
   implicit none
   
   type(particle), intent(in) :: myParticle
@@ -171,6 +171,7 @@ contains
   
   if(firstCall) then
     open(unit=lun,file='ptm_output/map_'//id_string//'.dat',action='write',status='replace')
+    write(lun,'(4es17.7e3)') myParticle%fluxMapCoordinates(1:4)
     firstCall = .FALSE.
   else
      open(unit=lun,file='ptm_output/map_'//id_string//'.dat',action='write',status='old',position='append',iostat=ierr)
@@ -187,7 +188,7 @@ contains
   
   energy = (gam-1.0d0)*myParticle%p(2)
   
-  write(lun,'(7es17.7e3)') myParticle%fluxMapCoordinates, energy
+  write(lun,'(7es17.7e3)') myParticle%t, myParticle%x, myParticle%fluxMapCoordinates(5:6), energy
   
   close(lun)
  
