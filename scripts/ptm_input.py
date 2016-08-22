@@ -23,7 +23,7 @@ ckm = 2.998e5 # Speed of light in km/s
 dtor = pi/180.0 # Degrees to radians conversion
 rtod = 180.0/pi # Radians to degrees conversion
 
-def get_default_inputs(ivelocity=1,idensity=1):
+def get_default_inputs(ivelocity=3,idensity=1):
   """
   Populate the configuration dictionary with appropriate keys and default values. Two input values are used to determine
   what set of parameters are initialized into the dictionary.
@@ -90,7 +90,9 @@ def get_default_inputs(ivelocity=1,idensity=1):
   
   """
 
-  # Default parameters for ptm_parameters file
+  # Change these parameter defaults as appropriate for your application.
+
+  # Default parameters for ptm_parameters file. 
   pdict={}
   pdict['runid']=1
   pdict['nparticles']=1   # Number of particles to use in simulation
@@ -112,26 +114,26 @@ def get_default_inputs(ivelocity=1,idensity=1):
   pdict['mass']=1.0       # Particle mass in multiples of the electron mass
   pdict['tlo']=0.0        # Lowest time of particle trace
   pdict['thi']=3600.0     # Highest time of particle trace
-  pdict['itraj']=0    # Write particle trajectories if in flux map mode: 0 = no, 1 = yes
+  pdict['itraj']=0        # Write particle trajectories if in flux map mode: 0 = no, 1 = yes
   
   # Default parameters for velocity file
   vdict={}
 
   vdict['idist']=ivelocity  
   if(ivelocity==1):
-    # Beam
+    # Ring
     vdict['idist']=1
     vdict['ekev']=100.0     # Particle energy in keV
     vdict['alpha']=90.0     # Particle pitch angle in degrees
     vdict['phi']=180.0      # Particle gyrophase angle in degrees; set negative to seed randomly
   elif(ivelocity==2):
-    # Maxwellian
+    # Bi-Maxwellian
     vdict['idist']=2
     vdict['vtperp']=0.25*ckm  # Perpendicular thermal velocity in km/s
     vdict['vtpara']=0.25*ckm  # Parallel thermal velocity in km/s
     vdict['phi']=180.0        # Gyrophase angle in degrees; set negative to seed randomly
   elif(ivelocity==3):
-    # Flux map mode
+    # Uniform flux map mode
     vdict['idist']=3
     vdict['nenergy']=34       # Number of energies to use in discrete flux map
     vdict['npitch']=31        # Number of pitch angles to use in discrete flux map
@@ -140,6 +142,13 @@ def get_default_inputs(ivelocity=1,idensity=1):
     vdict['emax']=100.0       # Highest energy of flux map (keV)
     vdict['pamin']=0.0        # Lowest pitch angle of flux map (degrees)
     vdict['pamax']=90.0       # Highest pitch angle of flux map (degrees)
+    vdict['xsource']=-12.0    # XGSM distance where integration should be terminated (RE)
+  elif(ivelocity==4):
+    # User-specified flux map mode
+    vdict['idist']=3
+    vdict['nenergy']=34       # Number of energies to use in discrete flux map
+    vdict['npitch']=31        # Number of pitch angles to use in discrete flux map
+    vdict['phi']=180.0        # Gyrophase angle in degrees; set negative to seed randomly
     vdict['xsource']=-12.0    # XGSM distance where integration should be terminated (RE)
   else:
     raise Exception('Option ivelocity = '+str(ivelocity)+' is not supported.')

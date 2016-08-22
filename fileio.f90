@@ -106,7 +106,8 @@ contains
   dataStore(2:4) = xpos
   dataStore(5) = vperp/gam
   dataStore(6) = vpara/gam
-  dataStore(7) = myParticle%p(2)*(gam-1.d0) 
+  dataStore(7) = myParticle%p(2)*(gam-1.d0)
+  
   if(vpara==0.0d0) then ! Handle special case to avoid divide-by-zero error
     dataStore(8) = 90.0d0
   else ! Use absolute value because we're only concerned about relative angle here
@@ -140,8 +141,7 @@ contains
     open(unit=lun,file='ptm_output/ptm_'//id_string//'.dat',action='write',status='old',position='append',iostat=ierr)
     call assert(ierr==0,'writeDataStore','error opening ptm_'//int2str(runid)//'.dat')
     write(lun,*) '#'
-    ! The # symbol separates data from different particles and is a comment in python, facilitating the
-    ! parsing of these (possibly large, ~100 MB) data files 
+    ! The # symbol separates data from different particles
   endif
 
   do i=1,size(dataStore,1)

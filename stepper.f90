@@ -37,7 +37,6 @@ contains
   real(dp), intent(in) :: tnext
   real(dp), parameter :: kappa_orbit = 1.0d-2 ! These two values are set so that a particle doesn't just
   real(dp), parameter :: kappa_drift = 0.8d-2 ! oscillate between drift and orbit in regions of marginal smoothness
-  integer :: i, iflag
   real(dp) :: b0, wc, kappa, t, igam, t_int, rho
   real(dp), dimension(3) :: bhat, bvec, rvec, rhat
   real(dp), dimension(3) :: fE, fG, fC, fM
@@ -45,6 +44,7 @@ contains
   real(dp), dimension(3) :: gradb, gradbhat, evec, curlb, curlbhat
   real(dp), dimension(:), allocatable :: y
   real(dp), dimension(:), allocatable :: yp
+  integer :: i, iflag
 
   ! Initialize storage for the integrators and communicators if using RKSuite
   if(myParticle%drift) then
@@ -73,13 +73,13 @@ contains
       ! Solve guiding center drift equations
 
       select case(istep)
-        case(1) ! Use fixed timestep RK4 integrator
-
+        case(1) 
+          ! Use fixed timestep RK4 integrator
           call rk4(drift_derivs,y,t,t_int-t)
           myParticle%y(1:4) = y
 
-        case(2) ! Use adaptive RKSuite integrator
-
+        case(2) 
+          ! Use adaptive RKSuite integrator
           call range_integrate(myParticle%comm,drift_derivs,t_int,t,y,yp,flag=iflag)
           myParticle%t = t
           myParticle%y(1:4) = y
@@ -95,11 +95,12 @@ contains
     else ! Particle is in full orbit
 
       select case(istep)
-        case(1) ! Use fixed timestep RK4 integrator
+        case(1) 
+          ! Use fixed timestep RK4 integrator
           call rk4(orbit_derivs,y,t,t_int-t)
           myParticle%y(1:6) = y
-        case(2) ! Use adaptive RKSuite integrator
-
+        case(2) 
+          ! Use adaptive RKSuite integrator
           call range_integrate(myParticle%comm,orbit_derivs,t_int,t,y,yp,flag=iflag)
           myParticle%t = t
           myParticle%y(1:6) = y
@@ -136,11 +137,13 @@ contains
           kappa = 0.9d0*kappa_drift
       case(1:) ! Full particle orbits only (FO)
           kappa = 1.1d0*kappa_drift
-      case(0) ! Dynamically switch btwn GC and FO
+      case(0 ) ! Dynamically switch btwn GC and FO
           kappa = rho*norm(gradb)/b0
     end select
 
-    if(kappa > kappa_orbit) then ! Use full particle orbits
+    if(kappa > kappa_orbit) then 
+      ! Use full particle orbits
+      
       if(myParticle%drift) then 
         ! Switch to full orbit representation if currently in guiding center
         call drift_to_full(myParticle)
@@ -150,13 +153,16 @@ contains
 
         y = myParticle%y(1:6)
 
-        if(istep==2) then ! Need to modify RKSuite communicator settings for orbit equations
+        if(istep==2) then 
+          ! Modify RKSuite communicator settings for orbit equations
           call collect_garbage(myParticle%comm)
           call setup(myParticle%comm,t,y,tnext,tol,(/(thresh,i=1,6)/),method='M',task='R',message=.FALSE.)
         endif
  
       endif
-    else 
+    else
+      ! Use guiding center equations
+     
       if(.not. myParticle%drift .and. kappa < kappa_drift) then 
         ! Switch to guiding center if currently in full particle representation
 
@@ -167,7 +173,8 @@ contains
 
         y = myParticle%y(1:4)
 
-        if(istep==2) then ! Need to modify RKSuite communicator settings for drift equations
+        if(istep==2) then 
+          ! Modify RKSuite communicator settings for drift equations
           call collect_garbage(myParticle%comm)
           call setup(myParticle%comm,t,y,tnext,tol,(/(thresh,i=1,4)/),method='H',task='R',message=.FALSE.)          
         endif
@@ -191,7 +198,8 @@ contains
       fC =  myParticle%v(1)**2*gradbhat*igam
       fM =  myParticle%p(1)*evec-myParticle%v(2)*dot_product(bhat,gradb)*igam
       myParticle%dt = sign(epsilon_drift*sqrt(myParticle%v(1)**2+2.0d0*myParticle%v(2)*b0)/norm(fE+fG+fC+fM),real(itrace,dp))
-    else ! Resolve gyro-orbits
+    else 
+      ! Resolve gyro-orbits
       myParticle%dt = sign(epsilon_orbit/wc,real(itrace,dp))
     endif
 
@@ -245,7 +253,8 @@ contains
     real(dp), dimension(3) :: evec, bvec
     real(dp) :: gami
 
-    if(.not. myParticle%integrate) then ! This particle being taken offline, don't worry about calculating anything.
+    if(.not. myParticle%integrate) then 
+      ! This particle is being taken offline, don't worry about calculating anything.
       ydot = 0.d0
     else
 
@@ -258,7 +267,8 @@ contains
       ydot(1:3) =  gami*myParticle%v/re
       ydot(4:6) =  myParticle%p(1)*(evec+gami*cross_product(myParticle%v,bvec))
 
-      if(ndim==2) then ! Set z-derivatives to zero
+      if(ndim==2) then 
+        ! Set z-derivatives to zero
         ydot(3) = 0.d0
         ydot(6) = 0.d0
       endif
@@ -286,7 +296,8 @@ contains
     real(dp), dimension(3) :: estar, bstar, gradb, curlb, curlbhat, vdrift, curlE, dbhatdt
     real(dp) :: bstarpara, gami, b0, dupara
 
-    if(.not. myParticle%integrate) then ! This particle has finished integration, take it offline
+    if(.not. myParticle%integrate) then 
+      ! This particle has finished integration, take it offline
       ydot = 0.d0
     else
       myParticle%t = t
@@ -362,7 +373,7 @@ contains
   myParticle%v(2) = dot_product(vperp,vperp)/(2.0d0*b0)
 
   if(ndim==2) then
-  ! Prevent "accidental" introduction of paralell motion or displacements
+    ! Prevent "accidental" introduction of paralell motion or displacements
     myParticle%x(3) = 0.5d0
     myParticle%v(1) = 0.0d0
   endif
@@ -399,7 +410,8 @@ contains
 
   select case(iphase)
   
-    case(1) ! Random gyrophase
+    case(1) 
+      ! Random gyrophase
       R = fac_rotation_matrix(myParticle)
       phi = twopi*random_uniform()
   
@@ -411,9 +423,10 @@ contains
       vhat = sign(1.0d0,myParticle%p(1))*cross_product(bhat,rhat)
       vhat = vhat/norm(vhat)
         
-    case(2) ! Brute-force minimization of delta B
+    case(2) 
+      ! Brute-force minimization of delta B
 
-      R = fac_rotation_matrix(myParticle)
+      R = fac_rotation_matrix(myParticle,toCartesian=.TRUE.)
       xgc = myParticle%x
 
       do i=1,nphase
@@ -442,14 +455,15 @@ contains
       vhat = vhat/norm(vhat)
       myParticle%x = xgc
   
-  case(3) ! Pfefferle's grad B method to minimize delta B
+  case(3) 
+    ! Pfefferle's grad B method to minimize delta B
 
     ! Calculate the local magnetic field and the direction of its gradient
     call get_fields(myParticle,bvec,gradb=Bgrad)
 
     gradb = matmul(Bgrad,bhat)
 
-    ! Put particle along direction orthogonal to gradb and b
+    ! Put particle along direction orthogonal to both gradb and b
     rhat = cross_product(bhat,gradb)
     rhat = rhat/norm(rhat)
   
@@ -462,7 +476,7 @@ contains
   myParticle%v = vpara*bhat+vperp*vhat
   
   if(ndim==2) then
-  ! Prevent "accidental" introduction of paralell motion or displacements
+    ! Prevent "accidental" introduction of paralell motion or displacements
     myParticle%x(3) = 0.5d0
     myParticle%v(3) = 0.0d0
   endif
@@ -480,6 +494,7 @@ contains
   ! An adaptive method with error control is available from the RKSuite library (set istep=2)
   !
   ! Jesse Woodroffe, 8/7/15
+  
   implicit none
 
   interface

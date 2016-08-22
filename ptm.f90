@@ -39,7 +39,7 @@ do n=1,nparticles
 
   call particle_initialize(myParticle,n)
   call storeData(myParticle,particleData(0,:)) ! Initial conditions
-  
+   
   do iwrite=1,nwrite
     call stepper_push(myParticle,myParticle%t+sign(dtOut,real(itrace,dp)))
     call storeData(myParticle,particleData(iwrite,:))
