@@ -7,6 +7,7 @@
 -1       				 Direction of trace, -1 = backwards from end, +1 = forwards from start
 1        				 Index of first data file
 2        				 Index of last data file
+2						 total number of timesteps in tgrid
 3600.0   				 Cadence of input files (s), if negative get values from tgrid
 1.0      				 Cadence of output files (s)
 1        				 Time integrator, 1= RK4, 2= RKSuite
