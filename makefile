@@ -10,8 +10,8 @@ SHELL = /bin/sh
 # Code currently doesn't compile under gfortran because of our use of [] for initializing
 # two-dimensional array constants
 F90 = gfortran
-#OPT = -ffree-form -ffree-line-length-none -std=f2008ts -O3 -lgomp -ffpe-trap=invalid -fbacktrace
-OPT = -ffree-form -ffree-line-length-none -std=f2008ts -O3 -march=native -lgomp
+#OPT = -ffree-form -ffree-line-length-none -std=f2008ts -O3 -fopenmp -ffpe-trap=invalid -fbacktrace
+OPT = -ffree-form -ffree-line-length-none -std=f2008ts -O3 -march=native -fopenmp
 
 all:ptm
 
