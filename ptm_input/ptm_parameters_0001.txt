@@ -17,3 +17,4 @@
 1.0      				 mass in multiples of electron mass
 0.0      				 lower limit of time integration (s)
 3600.0   				 upper limit of time integration (s)
+0						 write trajectories in flux map mode
