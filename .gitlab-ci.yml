@@ -1,0 +1,7 @@
+test:default:
+  image: louisvernon/lanlgcc48
+  script:
+    - sudo -E apt-get -y install gfortran
+    - sudo -E apt-get -y install libblas-dev liblapack-dev 
+    - make 
+    - ./ptm 1
