@@ -34,7 +34,7 @@ real(dp), parameter :: tol = 1.0d-6
 real(dp), parameter :: thresh = 1.0d-10
 real(dp), parameter :: twopi = 8.d0*atan(1.d0)
 real(dp), parameter :: epsilon_drift = 0.1d0
-real(dp), parameter :: epsilon_orbit = 0.01d0
+real(dp), parameter :: epsilon_orbit = 0.05d0
 
 integer :: runid
 integer :: ndim

@@ -227,7 +227,8 @@ contains
     endif
 
     ! If tracing particle fluxes, terminate integration when it reaches specified boundary
-    if(fluxMap .and. myParticle%x(1) <= xsource) then
+    if(fluxMap .and. (myParticle%x(1) <= xsource)) then
+      write(*,*) "Particle has reached source region boundary"
       myParticle%integrate = .FALSE.
       exit
     endif
@@ -283,7 +284,7 @@ contains
 
     function drift_derivs(t,y) result(ydot)
     ! Calculates the derivatives for advancing guiding center trajectory 
-    ! using the equations of Tao, Brizard, and Chan [2007]. This version has been modified to inclued
+    ! using the equations of Cary & Brizard [2009]. This version has been modified to inclued
     ! the effects of time-varying magnetic fields via curl E. [method due to M. Henderson]
 
     implicit none
@@ -476,7 +477,7 @@ contains
   myParticle%v = vpara*bhat+vperp*vhat
   
   if(ndim==2) then
-    ! Prevent "accidental" introduction of paralell motion or displacements
+    ! Prevent accidental introduction of paralell motion or displacements
     myParticle%x(3) = 0.5d0
     myParticle%v(3) = 0.0d0
   endif

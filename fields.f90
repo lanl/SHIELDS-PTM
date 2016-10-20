@@ -38,8 +38,6 @@ contains
     allocate(EX3D(nt,nx,ny,nz),EY3D(nt,nx,ny,nz),EZ3D(nt,nx,ny,nz))
   endif
 
-  allocate(tgrid(ntot))
-
   ! Read data files files
   call read_array('ptm_data/xgrid.bin',xgrid)
   call read_array('ptm_data/ygrid.bin',ygrid)
@@ -52,18 +50,28 @@ contains
 
   ! Spatial and temporal ranges
   if(dtIn > 0.0d0) then
-    ! User is specifying time spacing of files
+    ! We are specifying what files to use, determine the times corresponding to those files
 
+    allocate(tgrid(nt))
     TMin = 0.0d0
-    TMax = dtIn*(nt-1)
+    TMax = dtIn*real(nt-1,dp)
     tgrid = linspace(TMin,Tmax,nt)
 
   else
-
+  
+    ! We are reading in the grid directly, figure out what files are needed
+  
+    allocate(tgrid(ntot))
+  
     call read_array('ptm_data/tgrid.bin',tgrid)
 
-    TMin = minval(tgrid)
-    TMax = maxval(tgrid)
+    ifirst = maxval(maxloc(tgrid,tgrid<tlo))
+    ilast = maxval(minloc(tgrid,tgrid>thi))
+
+    nt = ilast-ifirst+1
+
+    TMin = tgrid(ifirst)
+    TMax = tgrid(ilast)
 
   endif
 

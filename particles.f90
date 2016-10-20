@@ -111,8 +111,8 @@ contains
       
       allocate(pitchAngles(abs(nPitchAngles)))
       allocate(energies(abs(nEnergies)))    
-      call read_array('energies.bin',energies)
-      call read_array('pitchangles.bin',pitchAngles)    
+      call read_array('ptm_data/energies.bin',energies)
+      call read_array('ptm_data/pitchangles.bin',pitchAngles)    
 
     case default
     
@@ -272,7 +272,7 @@ contains
       enddo
       ! Parallel momentum comes from a normal Maxwellian
       vz = vtpara*random_gauss()
-    case(3) ! Set up particle properties for flux map mode
+    case(3:4) ! Set up particle properties for flux map mode
       call assert(present(tag),'particle_initialize','idist=3 requires specification of particle tag in calling routine')
       iEnergy = ceiling(tag/real(nPitchAngles))
       iPitchAngle = tag-(iEnergy-1)*nPitchAngles
