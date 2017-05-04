@@ -8,6 +8,7 @@ last revised 6/2/2016
 
 import numpy as np
 from scipy import special
+from scipy import linalg
 
 __dtor=np.pi/180.0
 __rtod=180.0/np.pi
@@ -19,7 +20,7 @@ def parse_trajectory_file(fname):
     an unknown number of rows. The data from each particle is separated by a "#".
 
     TIME XPOS YPOS ZPOS VPERP VPARA ENERGY PITCHANGLE
-    
+
     Results from this routine are returned as a dictionary with the trajectory of each particle stored under
     a separate integer key (0-based indexing: first particle is 0, second is 1, etc.)
 
@@ -42,51 +43,51 @@ def parse_map_file(fname):
   aren't output in a logical or predictable manner, this routine also assembles the energy--pitch-angle grids
   and returns the results in a dictionary. This is all the information that is needed from SHIELDS-PTM to
   assemble flux maps using the energy_to_flux routine.
-  
+
   Jesse Woodroffe
   5/23/2016
   """
-  
+
   res = np.loadtxt(fname,skiprows=1)
-  
+
   pavec = np.sort(np.unique(res[:,-2]))
   envec = np.sort(np.unique(res[:,-3]))
-  
+
   fluxmap={}
   fluxmap['energies']=envec
   fluxmap['angles']=pavec
-  
+
   xfinal = np.zeros([envec.size,pavec.size,3])
   Einit = np.zeros([envec.size,pavec.size])
   Efinal = np.zeros_like(Einit)
-  
+
   for icount in xrange(np.size(res,0)):
     idex = np.argwhere(res[icount,-3]==envec)
     jdex = np.argwhere(res[icount,-2]==pavec)
     Einit[idex,jdex]=res[icount,-3]
     Efinal[idex,jdex]=res[icount,-1]
     xfinal[idex,jdex,:]=res[icount,1:4]
-  
+
   fluxmap['init_E']=Einit
   fluxmap['final_E']=Efinal
   fluxmap['final_x']=xfinal
-  
+
   return fluxmap
 
 def energy_to_flux(ei,ef,ec,n,mc2=511.0,kind='kappa',kap=2.5,energyFlux=False):
     """
     Given the particle energy, number density of particles, and characteristic energy of the distribution,
-    calculate the differential energy flux in keV-1 cm-2 s-1 sr-1. 
-    
+    calculate the differential energy flux in keV-1 cm-2 s-1 sr-1.
+
     If you are performing backwards tracing from GEO to some point in the tail, Ei is the energy in the tail
     and Ef is the energy at GEO.
-    
+
     Required Inputs are:
       Ei    Initial energy (energy in source region) in keV
       Ef    Final energy (energy at observation point) in keV
       Ec    Characteristic energy of the distribution in keV (analogous to temperature)
       n     Density of particles in cm-3
-    
+
     Optional inputs are:
       mc2         Mass energy of the particle species in keV (default is 511 for electrons)
       kind        Type of distribution function to use
@@ -94,25 +95,25 @@ def energy_to_flux(ei,ef,ec,n,mc2=511.0,kind='kappa',kap=2.5,energyFlux=False):
                   'maxwell'   relativistic Maxwell-Juttner distribution
       kap         Power law index for the kappa distribution (default is 2.5)
       energyFlux  Whether or not to calculate energy fluxes (default is False)
-    
+
     The default value of kappa corresponds to electrons in a fairly strong substorm. For other species and
     levels of activity, Gabrielse et al. [2014] provided a table of values for kappa, derived from THEMIS
     observations:
-    
+
       |AL|    ions    electrons
       min     5.1     2.7
       int     4.6     2.7
       max     4.4     2.5
-    
+
     Values of n and Ec need to be obtained from some sort of tail plasma model, either kinetic or
     MHD (in which case Ec~P/rho). It is also important to remember that electron temperature usually
     differs from ion temperature, up to a factor of 7 different. It is up to the user to make sure
     that the correct temperature for the desired species is provided.
-    
+
     Jesse Woodroffe
     3/30/2016
     """
-    
+
     ckm=2.998e5
     gami=1+ei/mc2
     gamc=1+ec/mc2
@@ -120,7 +121,7 @@ def energy_to_flux(ei,ef,ec,n,mc2=511.0,kind='kappa',kap=2.5,energyFlux=False):
     u=ckm*np.sqrt(gami*gami-1.0)/gami
     w=ckm*np.sqrt(gamc*gamc-1.0)/gamc
     v=ckm*np.sqrt(gamf*gamf-1.0)/gamf
-    
+
     if(kind=='maxwell'):
       # Maxwell-Juttner distribution
       Q=ec/mc2
@@ -140,63 +141,139 @@ def energy_to_flux(ei,ef,ec,n,mc2=511.0,kind='kappa',kap=2.5,energyFlux=False):
       j*=ef
 
     return j
-   
+
+def calculate_electron_flux_1(ei,ef,x=[1.0,0.5,2.5]):
+    """
+    x[0] = density
+    x[1] = characteristic energy
+    x[2] = kappa index
+    """
+    ckm=2.998e5
+    mc2=511.0
+
+    n=x[0]
+    E=x[1]
+    kappa=x[2]
+
+    W=E*(1.0-1.5/kappa)
+
+    # Use gammaln instead of gamma to avoid overflow at large kappa
+
+    kf = np.exp(special.gammaln(kappa+1)-special.gammaln(kappa-0.5))
+    g = n*(mc2/(ckm*ckm*W*np.pi*kappa))**1.5*kf
+    f = g*(1+ei/(kappa*W))**-(kappa+1)
+
+    gamf = 1+ef/mc2
+    v = ckm*np.sqrt(gamf*gamf-1.0)/gamf
+
+    j=1e5*ckm*ckm*v*v/mc2*f
+
+    return j
+
+def calculate_electron_flux(ei,ef,x):
+
+    ckm=2.998e5
+    mc2=511.0
+
+    k1=x[0]
+    E1=x[1]
+    n1=x[2]
+    k2=x[3]
+    E2=x[4]
+    n2=x[5]
+
+    W1=E1*(1.0-1.5/k1)
+    W2=E2*(1.0-1.5/k2)
+
+    # Use gammaln instead of gamma to avoid overflow at large kappa
+
+    kf1 = np.exp(special.gammaln(k1+1)-special.gammaln(k1-0.5))
+    g1 = n1*(mc2/(ckm*ckm*W1*np.pi*k1))**1.5*kf1
+    f1 = g1*(1+ei/(k1*W1))**-(k1+1)
+
+    kf2 = np.exp(special.gammaln(k2+1)-special.gammaln(k2-0.5))
+    g2 = n2*(mc2/(ckm*ckm*W2*np.pi*k2))**1.5*kf2
+    f2 = g2*(1+ei/(k2*W2))**-(k2+1)
+
+    gamf = 1+ef/mc2
+    v = ckm*np.sqrt(gamf*gamf-1.0)/gamf
+
+    j=1e5*ckm*ckm*v*v/mc2*(f1+f2)
+
+    return j
+
+def flux_root_function_1(ei,ef,pav,oflux,x):
+
+    flux = calculate_electron_flux_1(ei,ef,x)
+    omni = calculate_omnidirectional_flux(pav,flux)
+    delt = linalg.norm(np.log10(omni/oflux))
+
+    return delt
+
+def flux_root_function(ei,ef,pav,oflux,x):
+
+    flux = calculate_electron_flux(ei,ef,x)
+    omni = calculate_omnidirectional_flux(pav,flux)
+    delt = linalg.norm(np.log10(omni/oflux))
+
+    return delt
+
 def calculate_omnidirectional_flux(pav,diffJ,angleDegrees=True,symmetry=True):
     """
     Calculate the omnidirectional flux given differential flux.
-    
+
     j_omni(E) = int_0^pi int_0^2pi dphi sinQ dQ j_diff(Q,phi,E)
               = 2pi int_0^pi dQ sinQ j_diff(Q,E)
-              
+
 
     Inputs:
       pav           1D array of floats   Vector containing pitch angles for each flux value
       diffJ         2D array of floats   Array containg differential fluxes j(a,E)
-      angleDegrees  logical,optional     Indicates if pitch angles are in degrees (True) or 
+      angleDegrees  logical,optional     Indicates if pitch angles are in degrees (True) or
                                          radians (set to False). Default is True.
-      symmetry      logical,optional     Indicates if distribution is assumed symmetric wrt 
-                                         direction of magnetic field, so multiplies fluxes by 
+      symmetry      logical,optional     Indicates if distribution is assumed symmetric wrt
+                                         direction of magnetic field, so multiplies fluxes by
                                          a factor of two to account for this (basically, this
                                          assumes pitch angles are [0,90]). Default is true.
-    
+
     Outputs:
       omni          1D array of floats   Vector containing omnidirectional fluxes at each energy.
 
     Jesse Woodroffe
     6/17/2016
-    
+
     Modification history:
-    
+
     8/8/2016    Altered algorithm to allow for non-uniform pitch angle bins
-    
+
     """
-    
+
     # Check if array dimensions are reconcilable
     if(not (pav.size in diffJ.shape)):
         raise Exception('Error in calculate_omnidirectional_flux: Dimension mismatch between PAV and DIFFJ')
-    
+
     # Put angles in radians if necessary
     Q = pav*__dtor if angleDegrees else pav
-    
+
     # Transpose the flux array if necessary
     flux = diffJ if pav.size==np.size(diffJ,1) else diffJ.T
-               
+
     # Integration weight is 2 pi in azimuth times bin widths
     coef = 2.0*np.pi*np.diff(Q)
     if(symmetry): # If assuming directional symmetry, compensate for missing half
         coef*=2.0
     favg=0.5*(flux[:,1:]+flux[:,:-1])
     savg=np.sin(0.5*(Q[1:]+Q[:-1]))
-    
+
     # Perform the reduction to approximate the integral
     omniJ=np.einsum("i,ji",coef*savg,favg)
-    
+
     return omniJ
 
 def tm03_moments(x,y,swD,getDefaults=False):
     """
     The Tsyganeko and Mukai [2003] plasma sheet model (with corrected equations).
-    
+
     Inputs:
       x     GSM x position in Earth radii
       y     GSM y position in Earth radii
@@ -206,24 +283,24 @@ def tm03_moments(x,y,swD,getDefaults=False):
           'vx'    Solar wind speed in km/s
           'n'     Solar wind density in cm-3
           'p'     Solar wind dynamic pressure in nPa
-          
+
     Outputs:
       res   A dictionary with the following keys:
           'P'   Local pressure in nPa
           'T'   Local temperature in keV
           'n'   Local ion/electron density in cm-3
-          
+
     Reference:
-    
+
     Tsyganeko, N. A. and T. Mukai (2003), Tail plasma sheet models derived from Geotail particle data,
         J. Geophys. Res., 108(A3),1136, doi:10.1029/2002JA009707
-    
+
     The output from the TM03 model can be used to set n and Ec inputs to the energy_to_flux routine.
-    
+
     Jesse Woodroffe
     6/2/2016
     """
-    
+
     if(getDefaults):
       # Create a dictionary with default parameters and return it
       res={}
@@ -232,22 +309,27 @@ def tm03_moments(x,y,swD,getDefaults=False):
       res['vx']=500.0
       res['n']=10.0
       res['p']=3.0
-      
+
     else:
       # Evaluate TM03 model using provided parameters
-      aT=np.r_[0,1.678,-0.1606, 1.669, 4.820,  2.855, -0.602, -0.836,-2.491,
-               0.2568,0.2249,0.1887,-0.4458,-0.0331,-0.0241,-2.689, 1.222]
-      aN=np.r_[0,-0.159,0.608,0.5055,0.0796,0.2746,0.0361,-0.0342,-0.7935,1.162,0.4756,0.7117]
-      aP=np.r_[0,0.057,0.524,0.0908,0.527,0.078,-4.422,-1.533,
-               -1.217, 2.54, 0.32,  0.754,1.048,-0.074, 1.015]
+      aT=np.r_[ 0.0000, 1.6780,-0.1606, 1.6690, 4.8200, 2.8550,-0.6020,-0.8360,
+               -2.4910, 0.2568, 0.2249, 0.1887,-0.4458,-0.0331,-0.0241,-2.6890,
+                1.2220]
+      aN=np.r_[ 0.0000,-0.1590, 0.6080, 0.5055, 0.0796, 0.2746, 0.0361,-0.0342,
+               -0.7935, 1.1620, 0.4756, 0.7117]
+      aP=np.r_[ 0.0000, 0.0570, 0.5240, 0.0908, 0.5270, 0.0780,-4.4220,-1.5330,
+               -1.2170, 2.5400, 0.3200, 0.7540, 1.0480,-0.0740, 1.0150]
+
       bperp=swD['bperp']/5
       bz=swD['bperp']*np.cos(swD['theta']*__dtor)
+
       if(bz>0):
           bzn=bz/5.0
           bzs=0.0
       else:
           bzn=0.0
           bzs=bz/5.0
+
       vsw=swD['vx']/500.0
       nsw=swD['n']/10.0
       fsw=bperp*np.sqrt(np.sin(swD['theta']*__dtor/2))
@@ -255,14 +337,18 @@ def tm03_moments(x,y,swD,getDefaults=False):
       psw=swD['p']/3.0
       phi=-np.arctan2(y,x)
       rm1=rho-1.0
+
       T=(aT[1]*vsw+aT[2]*bzn+aT[3]*bzs+aT[4]*
          np.exp(-(aT[9]*vsw**aT[15]+aT[10]*bzn+aT[11]*bzs)*rm1)+
          (aT[5]*vsw+aT[6]*bzn+aT[7]*bzs+aT[8]*
           np.exp(-(aT[12]*vsw**aT[16]+aT[13]*bzn+aT[14]*bzs)*rm1))*np.sin(phi)**2)
+
       N=((aN[1]+aN[2]*nsw**aN[10]+aN[3]*bzn+aN[4]*vsw*bzs)*rho**aN[8]+
          (aN[5]*nsw**aN[11]+aN[6]*bzn+aN[7]*vsw*bzs)*rho**aN[9]*np.sin(phi)**2)
+
       P=(aP[1]*rho**aP[6]+aP[2]*psw**aP[11]*rho**aP[7]+aP[3]*fsw**aP[12]*rho**aP[8]+
-         (aP[4]*psw**aP[13]*np.exp(-aP[9]*rho)+aP[5]*fsw**aP[14]*np.exp(-aP[10]*rho))*np.sin(phi)**2) 
+         (aP[4]*psw**aP[13]*np.exp(-aP[9]*rho)+aP[5]*fsw**aP[14]*np.exp(-aP[10]*rho))*np.sin(phi)**2)
+
       res={'P':P,'T':T,'n':N}
-    
-    return res   
+
+    return res

@@ -82,3 +82,12 @@ def make_ephemeris(r_perigee,r_apogee,orbital_phase=0.0,nsamp=100,t0=0.0,inDegre
         t[i] = tcof*integrate.quad(lambda x:1.0/(1.0+e*np.cos(x+__dtor*orbital_phase))**2,__dtor*th[0],__dtor*th[i])[0]
 
     return np.c_[t,x,y,z,vx,vy,vz]
+
+def write_ephemeris(filename,ephemeris):
+
+    with open(filename,'w') as f:
+        # Write a simple one-line header
+        f.write('#{:11} {:12} {:12} {:12}'.format(*['Time(s)','X(Re)','Y(Re)','Z(Re)\n']))
+        for i in xrange(ephemeris.shape[0]):
+            dataline = '{:12.5f} {:12.7f} {:12.7f} {:12.7f}\n'.format(*ephemeris[i,:4])
+            f.write(dataline)
