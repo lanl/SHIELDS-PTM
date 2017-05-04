@@ -27,7 +27,9 @@ real(dp), dimension(:,:), allocatable :: particleData
 
 call get_run_id()
 call read_ptm_parameters()
-call fields_initialize() 
+
+call fields_initialize()
+
 call particles_initialize()
 call initialize_timing()
 
@@ -38,24 +40,26 @@ allocate(particleData(0:nwrite,8))
 do n=1,nparticles
 
   call particle_initialize(myParticle,n)
-  call storeData(myParticle,particleData(0,:)) ! Initial conditions
-   
-  do iwrite=1,nwrite
+
+  ! Store the initial conditions
+  call storeData(myParticle,particleData(0,:))
+
+  iwrite = 1
+  do
     call stepper_push(myParticle,myParticle%t+sign(dtOut,real(itrace,dp)))
     call storeData(myParticle,particleData(iwrite,:))
-    if(.not. myParticle%integrate) exit
+    if(.not. myParticle%integrate .or. iwrite==nwrite) exit
+    iwrite = iwrite+1
   enddo
 !$omp critical
-  if((.not. fluxMap) .or. itraj==1) then
-    if(iwrite < nwrite) then 
-      ! Particle encountered a boundary and kicked out early
-      call writeDataStore(particleData(:iwrite,:))
-    else 
-      ! Successful execution of all timesteps
-      call writeDataStore(particleData)
-    endif
-  endif
-  call writeFluxCoordinates(myParticle)
+
+  !******************
+  ! Write data files
+  !******************
+
+  if(fluxMap) call writeFluxCoordinates(myParticle)
+  if((.not. fluxMap) .or. itraj==1) call writeDataStore(particleData(:iwrite,:))
+
 !$omp end critical
   call particle_cleanup(myParticle)
 enddo

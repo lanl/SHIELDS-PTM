@@ -32,7 +32,7 @@ contains
   call random_seed(put=(/(irand+i,i=0,nseed-1)/))
 
   ! Configure velocity space distribution
-  
+
   lun = get_open_unit()
   open(unit=lun,file='ptm_input/dist_velocity_'//id_string//'.txt',action='read',status='old',iostat=ierr)
   call assert(ierr==0,'particles_initialize','error opening dist_velocity_'//id_string//'.txt')
@@ -40,7 +40,7 @@ contains
   read(lun,*) idist
 
   select case(idist)
-  
+
     case(1)
       ! Monoenergetic ring distribution
       read(lun,*) E0
@@ -50,22 +50,22 @@ contains
       vt = ckm*sqrt(gam*gam-1)/gam
       vp0 = gam*vt*sind(alpha)
       vz0 = gam*vt*cosd(alpha)
-      
-    case(2) 
+
+    case(2)
       ! Bi-Maxwellian distribution
       read(lun,*) vtperp
       read(lun,*) vtpara
       read(lun,*) phi0
-      
-    case(3) 
+
+    case(3)
       ! Automatic flux map mode
       ! This option overrides the 'nparticles' option from
       ! the ptm_parameters.txt file and sets it to the number
       ! of particles necessary to obtain the desired flux map.
-      
+
       fluxMap = .TRUE.
-      
-      read(lun,*) nEnergies   
+
+      read(lun,*) nEnergies
       read(lun,*) nPitchAngles
       read(lun,*) phi0
       read(lun,*) EkevMin
@@ -81,26 +81,26 @@ contains
       allocate(pitchAngles(abs(nPitchAngles)))
       allocate(energies(abs(nEnergies)))
 
-      if(nEnergies==1) then 
+      if(nEnergies==1) then
           energies=EkevMin
       else
         energies = linspace(EkevMin,EkevMax,nEnergies)
       endif
-      
+
       if(nPitchAngles==1) then
         pitchAngles = PitchAngleDegMin
-      else      
+      else
         pitchAngles = linspace(PitchAngleDegMin,PitchAngleDegMax,nPitchAngles)
       endif
-      
-    case(4) 
+
+    case(4)
       ! User-specified flux map mode
       ! This option overrides the 'nparticles' option from
       ! the ptm_parameters.txt file and sets it to the number
       ! of particles necessary to obtain the desired flux map.
 
       fluxMap = .TRUE.
-      read(lun,*) nEnergies   
+      read(lun,*) nEnergies
       read(lun,*) nPitchAngles
       read(lun,*) phi0
       read(lun,*) xsource
@@ -108,14 +108,14 @@ contains
       nparticles = nEnergies*nPitchAngles
       write(*,*) 'FLUX MAP MODE'
       write(*,*) 'NPARTICLES = ', nparticles
-      
+
       allocate(pitchAngles(abs(nPitchAngles)))
-      allocate(energies(abs(nEnergies)))    
+      allocate(energies(abs(nEnergies)))
       call read_array('ptm_data/energies.bin',energies)
-      call read_array('ptm_data/pitchangles.bin',pitchAngles)    
+      call read_array('ptm_data/pitchangles.bin',pitchAngles)
 
     case default
-    
+
       call assert(.FALSE.,'particles_initialize','idist='//int2str(idist)//' not supported')
 
   end select
@@ -128,7 +128,7 @@ contains
   call assert(ierr==0,'particles_initialize','error opening dist_density_'//id_string//'.txt')
 
   read(lun,*) idens
-  
+
   select case(idens)
     case(1) ! All particles are seeded at same position
       read(lun,*) x0
@@ -148,6 +148,8 @@ contains
       read(lun,*) mltMax
     case default
       call assert(.FALSE.,'particles_initialize','idens='//int2str(idens)//' not supported')
+
+
   end select
 
   return
@@ -171,12 +173,12 @@ contains
 !
 
   function fac_rotation_matrix(myParticle,toCartesian) result(R)
-  ! Calculate a matrix that rotates from Cartesian ("XYZ") coordinates to a between a local 
+  ! Calculate a matrix that rotates from Cartesian ("XYZ") coordinates to a between a local
   ! field-aligned coordinate system ("PQB"). PQB is equaivalent to the dipole coordinate system
   ! when the magnetic field is dipolar. The inverse transform is given by the transpose of the
   ! matrix.
   !
-  ! P is the "x-like" coordinate which points in a direction perpendicular to both Q and B 
+  ! P is the "x-like" coordinate which points in a direction perpendicular to both Q and B
   !   directions. For a dipole field, this is in the direction of the local radius of curvature
   ! Q is the "y-like" coordinate which points in a direction perpendicular to both the radial
   !   direction and the magnetic field. For a dipole magnetic field this is the azimuthal direction.
@@ -184,30 +186,30 @@ contains
   !
   ! Jesse Woodroffe
   ! 8/22/2016
-  
+
   implicit none
-  
+
   type(particle) :: myParticle
   real(dp), dimension(3,3) :: R
   real(dp), dimension(3) :: bhat, phat, qhat, rhat
   logical, intent(in), optional :: toCartesian
-  
+
   call get_fields(myParticle,bhat)
   bhat = bhat/norm(bhat)
   rhat = myParticle%x/norm(myParticle%x)
   qhat = cross_product(bhat,rhat)
   phat = cross_product(qhat,bhat)
-  
+
   ! Populate rotation matrix
   R(1,:) = phat
   R(2,:) = qhat
   R(3,:) = bhat
-  
+
   ! If rotaion from FAC to Cartesian is desired, transpose rotation matrix
   if(present(toCartesian)) then
     if(toCartesian) R = transpose(R)
   endif
-  
+
   return
 
   end function fac_rotation_matrix
@@ -287,6 +289,7 @@ contains
       call assert(.FALSE.,'particle_initialize','idist='//int2str(idist)//' not supported')
   end select
 
+
   ! Seed gyrophase as appropriate
   phi = merge(dtor*phi0,twopi*random_uniform(),phi0>0.0d0)
   gam = sqrt(1.d0+(vp**2+vz**2)/csq)
@@ -305,7 +308,7 @@ contains
   ! Set the particle at the correct time in order to allow for forward and reverse tracing
   myParticle%t = merge(Tlo,Thi,itrace>0)
   myParticle%drift = .FALSE.
-                       
+
   ! Initialize the grid and interpolators
   im = locate(xgrid,x)
   jm = locate(ygrid,y)
@@ -321,12 +324,12 @@ contains
 
   ! Call the fields routine to initialize the tricubic coefficients and determine the initial timestep
   call get_fields(myParticle,bvec,doInit=.TRUE.)
-  
+
   bhat = bvec/norm(bvec)
-   
+
   R = fac_rotation_matrix(myParticle,toCartesian=.TRUE.)
   rhat = matmul(R,[cos(phi),sin(phi),0.0d0])
-  
+
   ! Initialize particle velocity in Cartesian coordinates
   myParticle%v = vz*bhat+vp*rhat
 

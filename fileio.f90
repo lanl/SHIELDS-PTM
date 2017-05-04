@@ -25,7 +25,7 @@ contains
 
   lun = get_open_unit()
   open(unit=lun,file='ptm_input/ptm_parameters_'//id_string//'.txt',action='read',status='old',iostat=ierr)
-  
+
   call assert(ierr==0,'read_ptm_parameters','could not open ptm_parameters_'//id_string//'.txt')
 
   read(lun,*) runid
@@ -54,7 +54,7 @@ contains
   call assert(nphase > 0,'read_ptm_parameters','nphase must be greater than zero.')
   dphi = twopi/real(nphase,dp)
 
-  ! Charge/mass ratio for all particles  
+  ! Charge/mass ratio for all particles
   charge_mass_ratio = charge/mass
 
   ! Number of timesteps
@@ -107,7 +107,7 @@ contains
   dataStore(5) = vperp/gam
   dataStore(6) = vpara/gam
   dataStore(7) = myParticle%p(2)*(gam-1.d0)
-  
+
   if(vpara==0.0d0) then ! Handle special case to avoid divide-by-zero error
     dataStore(8) = 90.0d0
   else ! Use absolute value because we're only concerned about relative angle here
@@ -151,33 +151,33 @@ contains
   close(lun)
 
   return
-  
+
   end subroutine writeDataStore
-  
+
 !
 
   subroutine writeFluxCoordinates(myParticle)
-  ! This program writes out a simple set of flux mapping coordinates that can be used to apply Liouville's
-  ! theorem for calculating particle fluxes. Output file contains time initialized, 
+  ! This program writes out a simple set of flux mapping coordinates that can be used to apply Liouville's theorem
+
   implicit none
-  
+
   type(particle), intent(in) :: myParticle
   integer :: lun, ierr
   logical, save :: firstCall = .TRUE.
   real(dp) :: gam, b0, energy
   real(dp), dimension(3) :: bvec
-  
+
   lun = get_open_unit()
-  
+
   if(firstCall) then
     open(unit=lun,file='ptm_output/map_'//id_string//'.dat',action='write',status='replace')
     write(lun,'(4es17.7e3)') myParticle%fluxMapCoordinates(1:4)
     firstCall = .FALSE.
   else
      open(unit=lun,file='ptm_output/map_'//id_string//'.dat',action='write',status='old',position='append',iostat=ierr)
-     call assert(ierr==0,'writeFluxCoordinates','error opening ptm_'//int2str(runid)//'.dat') 
+     call assert(ierr==0,'writeFluxCoordinates','error opening ptm_'//int2str(runid)//'.dat')
   endif
-  
+
   if(myParticle%drift) then
     call get_fields(myParticle,bvec)
     b0 = norm(bvec)
@@ -185,13 +185,13 @@ contains
   else
     gam=sqrt(1.0d0+dot_product(myParticle%v,myParticle%v)/csq)
   endif
-  
+
   energy = (gam-1.0d0)*myParticle%p(2)
-  
+
   write(lun,'(7es17.7e3)') myParticle%t, myParticle%x, myParticle%fluxMapCoordinates(5:6), energy
-  
+
   close(lun)
- 
-  end subroutine writeFluxCoordinates  
+
+  end subroutine writeFluxCoordinates
 
 end module fileio

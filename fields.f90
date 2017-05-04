@@ -58,15 +58,15 @@ contains
     tgrid = linspace(TMin,Tmax,nt)
 
   else
-  
+
     ! We are reading in the grid directly, figure out what files are needed
-  
+
     allocate(tgrid(ntot))
-  
+
     call read_array('ptm_data/tgrid.bin',tgrid)
 
-    ifirst = maxval(maxloc(tgrid,tgrid<tlo))
-    ilast = maxval(minloc(tgrid,tgrid>thi))
+    ifirst = maxval(maxloc(tgrid,tgrid<=tlo))
+    ilast = maxval(minloc(tgrid,tgrid>=thi))
 
     nt = ilast-ifirst+1
 
@@ -81,6 +81,11 @@ contains
   YMax = maxval(ygrid)
   ZMin = minval(zgrid)
   ZMax = maxval(zgrid)
+
+  write(*,*) "SIMULATION DOMAIN"
+  write(*,*) xmin, " <= X <= ", xmax
+  write(*,*) ymin, " <= Y <= ", ymax
+  write(*,*) zmin, " <= Z <= ", zmax
 
   ! Get electromagnetic fields
 
@@ -115,16 +120,18 @@ contains
       call read_array(dfile,EZ3D(i,:,:,1))
       EZ3D(i,:,:,2) = EZ3D(i,:,:,1)
 
-    enddo 
+    enddo
 
   else
 
     write(*,*) "Reading 3D electromagnetic field data"
 
     do j=ifirst,ilast
+
       i = j-ifirst+1
 
       write(dfile,'("ptm_data/bx3d_",i4.4,".bin")') j
+
       call read_array(dfile,BX3D(i,:,:,:))
 
       write(dfile,'("ptm_data/by3d_",i4.4,".bin")') j
@@ -185,14 +192,20 @@ contains
     if(myParticle%x(2) < ymin .or. myParticle%x(2) > ymax) write(*,'(a20,3es16.5)') "Y OUT OF BOUNDS", ymin, myParticle%x(2), ymax
     if(myParticle%x(3) < zmin .or. myParticle%x(3) > zmax) write(*,'(a20,3es16.5)') "Z OUT OF BOUNDS", zmin, myParticle%x(3), zmax
 
+    write(*,*) "PARTICLE POSITION WHEN LEAVING DOMAIN"
+    write(*,*) tmin, myparticle%t,    tmax
+    write(*,*) xmin, myparticle%x(1), xmax
+    write(*,*) ymin, myparticle%x(2), ymax
+    write(*,*) zmin, myparticle%x(3), zmax
+
     ! Mark particle as finished
     myParticle%integrate=.FALSE.
 
     ! Put the particle on the nearest edge of the 4D domain for flux mapping
     ! (These values won't be used for further trajectory integration)
-    
+
     ! ::NOTE THE COMMENTED SECTIONS ON THE FOLLOWING LINES, NEED TO CONFIRM THIS DOESN'T BREAK ANYTHING::
-        
+
     if(myParticle%x(1) <= xmin) myParticle%x(1) = xmin!+0.5*myParticle%grid%dx
     if(myParticle%x(1) >= xmax) myParticle%x(1) = xmax!-0.5*myParticle%grid%dx
     if(myParticle%x(2) <= ymin) myParticle%x(2) = ymin!+0.5*myParticle%grid%dy
@@ -228,7 +241,7 @@ contains
   if(im==nx) im = im-1
   if(jm==ny) jm = jm-1
   if(km==nz) km = km-1
-  if(lm==nt) lm = lm-1 
+  if(lm==nt) lm = lm-1
 
   ! Update the grid and initialize the interpolators
   if(any((/im .ne. myParticle%grid%im, &
@@ -279,7 +292,7 @@ contains
             idy = 0
             jmin = j-1
             jmax = j+1
-          endif        
+          endif
           yseg=ygrid(jmin:jmax)
           do kk=1,2
             k=km+kk-1
@@ -433,7 +446,7 @@ contains
     if(present(grade)) then
       call tricubic_interpolate(myParticle%exinterp(1,:),myParticle%grid,myParticle%x(1),myParticle%x(2),myParticle%x(3),e1,gradf=grad1)
       call tricubic_interpolate(myParticle%exinterp(2,:),myParticle%grid,myParticle%x(1),myParticle%x(2),myParticle%x(3),e2,gradf=grad2)
-      grade(:,1) = (xim*grad1+xi*grad2)/re 
+      grade(:,1) = (xim*grad1+xi*grad2)/re
       evec(1) = xim*e1+xi*e2
       call tricubic_interpolate(myParticle%eyinterp(1,:),myParticle%grid,myParticle%x(1),myParticle%x(2),myParticle%x(3),e1,gradf=grad1)
       call tricubic_interpolate(myParticle%eyinterp(2,:),myParticle%grid,myParticle%x(1),myParticle%x(2),myParticle%x(3),e2,gradf=grad2)
@@ -460,7 +473,7 @@ contains
   if(present(gradb)) then
     call tricubic_interpolate(myParticle%bxinterp(1,:),myParticle%grid,myParticle%x(1),myParticle%x(2),myParticle%x(3),b1,gradf=grad1)
     call tricubic_interpolate(myParticle%bxinterp(2,:),myParticle%grid,myParticle%x(1),myParticle%x(2),myParticle%x(3),b2,gradf=grad2)
-    gradb(:,1) = (xim*grad1+xi*grad2)/re 
+    gradb(:,1) = (xim*grad1+xi*grad2)/re
     bvec(1) = xim*b1+xi*b2
     call tricubic_interpolate(myParticle%byinterp(1,:),myParticle%grid,myParticle%x(1),myParticle%x(2),myParticle%x(3),b1,gradf=grad1)
     call tricubic_interpolate(myParticle%byinterp(2,:),myParticle%grid,myParticle%x(1),myParticle%x(2),myParticle%x(3),b2,gradf=grad2)
