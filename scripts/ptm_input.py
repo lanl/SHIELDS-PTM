@@ -4,272 +4,401 @@ for the description of various parameters.
 
 Usage:
 
-  The simplest case is used to generate a single particle drift trace for dipole field test data:
+    The simplest case is used to generate a single particle drift trace for a pre-defined test:
 
-  config=ptm_input.get_default_inputs()
-  ptm_input.create_input_files(config)
+    import ptm_input
+    p=ptm_input.ptm_input_creator()
+    p.create_input_files()
 
-  Other input files can be created by modifying the elements of the configuration dictionary, config.
+This is an object-oriented version of a procedural code of the same name.
 
 Jesse Woodroffe
-6/7/2016
-
-Last updated: 3/24/2017 Modified create_input_files for greater flexibility using string format methods
-rather than c-style string formatters. Removed extraneous global variables
+5/30/2017
 
 """
 
+import numpy as np
+
 # Define constants for convenience
-__ckm = 2.998e5 # Speed of light in km/s
 
-def get_default_inputs(ivelocity=3,idensity=1):
-  """
-  Populate the configuration dictionary with appropriate keys and default values. Two input values are used to determine
-  what set of parameters are initialized into the dictionary.
+__ckm = 2.998e5         # Speed of light in km/s
+__dtor = np.pi/180.0    # Convert degrees to radians
+__rtod = 180.0/np.pi    # Convert radians to degrees
 
-  * * * * * * * * * *
-  ----------
-  | INPUTS |
-  ----------
+class ptm_input_creator(object):
+    """
+    An object for creating input data files for the SHIELDS-PTM code framework
+    """
 
-  This routine has two optional inputs, ivelocity and idensity.
+    # These are internal parameter sets which differ based on certain arguments.
 
-  ivelocity: Integer [1 2 3]
+    __pkeys=['runid','nparticles','ndim','nx','ny','nz','itrace','ifirst','ilast','ntot','dtin','dtout',
+             'istep','iswitch','iphase','nphase','charge','mass','tlo','thi','itraj']
 
-  1 = Monoenergetic beam (default); sets the following parameters:
-    E0    Beam energy (keV)
-    A0    Beam pitch angle (degrees)
-    PHI0  Particle gyrophase angle (degrees), set negative to seed randomly
-  2 = Maxwellian distribution; sets the following parameters:
-    VTPERP  Perpendicular thermal velocity (km/s)
-    VTPARA  Parallel thermal velocity (km/s)
-    PHI0    Particle gyrophase angle (degrees), set negative to seed randomly
-  3 = Flux map mode; sets the following parameters:
-    NENERGIES     Number of energies to use
-    NPITCHANGLES  Number of pitch angles to use
-    PHI0          Particle gyrophase angle (degrees), set negative to seed randomly
-    EKEVMIN       Lowest energy of flux map (keV)
-    EKEVMAX       Highest energy of flux map (keV)
-    PAMIN         Minimum pitch angle of flux map (degrees)
-    PAMAX         Maximum pitch angle of flux map (degrees)
+    __dkeys=[['idens','x0','y0','z0'],
+             ['idens','xmin','xmax','ymin','ymax','zmin','zmax'],
+             ['idens','r0','mltmin','mltmax']]
 
-  idensity: Integer [1 2 3]
+    __vkeys=[['idist','ekev','alpha','phi'],
+             ['idist','vtperp','vtpara','phi'],
+             ['idist','nenergy','npitch','phi','emin','emax','pamin','pamax','xsource'],
+             ['idist','nenergy','npitch','phi','xsource']]
 
-  1 = All particles at same position (default); sets the following parameters:
-    X0  Initial x-position (RE)
-    Y0  Initial y-position (RE)
-    Z0  Initial z-position (RE)
-  2 = Randomly seed throughout rectangular region; sets the following parameters:
-    XMIN  Minimum x-limit of region (RE)
-    XMAX  Maximum x-limit of region (RE)
-    YMIN  Minimum y-limit of region (RE)
-    YMAX  Maximum y-limit of region (RE)
-    ZMIN  Minimum z-limit of region (RE)
-    ZMAX  Maximum z-limit of region (RE)
-  3 = Randomly seed at fixed geocentric distance; sets the following parameters:
-    R0      Radial distance of seeding (RE)
-    MLTMIN  Minimum magnetic local time of seeding (HOURS)
-    MLTMAX  Maximum magnetic local time of seeding (HOURS)
+    def __init__(self,runid=1,idensity=1,ivelocity=1):
+        """
+        Initialize to default values for specified parameter sets
+        """
 
-  -----------
-  | OUTPUTS |
-  -----------
+        self.__pdict={}
+        self.__ddict={}
+        self.__vdict={}
 
-  ptmdict: Dictionary
+        self.__pdict['runid']=runid
+        self.__pdict['nparticles']=1   # Number of particles to use in simulation
+        self.__pdict['ndim']=3         # Number of spatial dimensions of input data (2 or 3)
+        self.__pdict['nx']=75          # Number of points in X grid
+        self.__pdict['ny']=75          # Number of points in Y grid
+        self.__pdict['nz']=75          # Number of points in Z grid
+        self.__pdict['itrace']=-1      # 1 = forward in time, -1 = backwards in time
+        self.__pdict['ifirst']=1       # Timestep of first fields snapshot: e.g., start at bx3d_0005.bin if ifirst=5
+        self.__pdict['ilast']=2        # Timestep of last fields snapshot: e.g., finish at bx3d_0009.bin if ilast=9
+        self.__pdict['ntot']=2         # Total number of time steps in tgrid file
+        self.__pdict['dtin']=3600.0    # Time between snapshots (seconds). If dtin<0, read times from tgrid.bin
+        self.__pdict['dtout']=1.0      # Time between data outputs (seconds)
+        self.__pdict['istep']=1        # Integrator to use: 1=RK4, 2=Adaptive RKSuite
+        self.__pdict['iswitch']=-1     # Particle equations to solve: -1=guiding center, 0=dynamic switching, 1=full orbit
+        self.__pdict['iphase']=3       # Gyrophase switching method: 1=random, 2=brute force search, 3=gradient method
+        self.__pdict['nphase']=32      # Number of points for brute force search (minimize difference in B)
+        self.__pdict['charge']=-1.0    # Particle charge in multiples of fundamental
+        self.__pdict['mass']=1.0       # Particle mass in multiples of the electron mass
+        self.__pdict['tlo']=0.0        # Lowest time of particle trace
+        self.__pdict['thi']=3600.0     # Highest time of particle trace
+        self.__pdict['itraj']=0        # Write particle trajectories if in flux map mode: 0 = no, 1 = yes
 
-  ptmdict has numerous keys that correspond to different parameters used to configure the ptm simulation. See
-  the code itself for descriptions of individual keys.
+        self.__vdict['idist']=ivelocity
 
-  * * * * * * * * * *
+        if(ivelocity==1):
+            # Ring
+            self.__vdict['idist']=1
+            self.__vdict['ekev']=100.0     # Particle energy in keV
+            self.__vdict['alpha']=90.0     # Particle pitch angle in degrees
+            self.__vdict['phi']=180.0      # Particle gyrophase angle in degrees; set negative to seed randomly
+        elif(ivelocity==2):
+            # Bi-Maxwellian
+            self.__vdict['idist']=2
+            self.__vdict['vtperp']=0.25*__ckm  # Perpendicular thermal velocity in km/s
+            self.__vdict['vtpara']=0.25*__ckm  # Parallel thermal velocity in km/s
+            self.__vdict['phi']=180.0        # Gyrophase angle in degrees; set negative to seed randomly
+        elif(ivelocity==3):
+        # Uniform flux map mode
+            self.__vdict['idist']=3
+            self.__vdict['nenergy']=34       # Number of energies to use in discrete flux map
+            self.__vdict['npitch']=31        # Number of pitch angles to use in discrete flux map
+            self.__vdict['phi']=180.0        # Gyrophase angle in degrees; set negative to seed randomly
+            self.__vdict['emin']=1.0         # Lowest energy of flux map (keV)
+            self.__vdict['emax']=100.0       # Highest energy of flux map (keV)
+            self.__vdict['pamin']=0.0        # Lowest pitch angle of flux map (degrees)
+            self.__vdict['pamax']=90.0       # Highest pitch angle of flux map (degrees)
+            self.__vdict['xsource']=-12.0    # XGSM distance where integration should be terminated (RE)
+        elif(ivelocity==4):
+        # User-specified flux map mode
+            self.__vdict['idist']=3
+            self.__vdict['nenergy']=34       # Number of energies to use in discrete flux map
+            self.__vdict['npitch']=31        # Number of pitch angles to use in discrete flux map
+            self.__vdict['phi']=180.0        # Gyrophase angle in degrees; set negative to seed randomly
+            self.__vdict['xsource']=-12.0    # XGSM distance where integration should be terminated (RE)
+        else:
+            raise Exception('Option ivelocity = '+str(ivelocity)+' is not supported.')
 
-  See inline commentary for descriptions of individual parameters.
+        if(idensity==1):
+            # Single point
+            self.__ddict['idens']=1
+            self.__ddict['x0']=-5.0      # Initial X-position (RE)
+            self.__ddict['y0']=0.0       # Initial Y-position (RE)
+            self.__ddict['z0']=0.0       # Initial Z-position (RE)
+        elif(idensity==2):
+            # Cubic region
+            self.__ddict['idensity']=2
+            self.__ddict['xmin']=-7.0    # Minimum X-boundary of seeding region (RE)
+            self.__ddict['xmax']=-6.0    # Maximum X-boundary of seeding region (RE)
+            self.__ddict['ymin']=-0.5    # Minimum Y-boundary of seeding region (RE)
+            self.__ddict['ymax']= 0.5    # Maximum Y-boundary of seeding region (RE)
+            self.__ddict['zmin']=-0.5    # Minimum Z-boundary of seeding region (RE)
+            self.__ddict['zmax']=0.5     # Maximum Z-boundary of seeding region (RE)
+        elif(idensity==3):
+            # Radial distance
+            self.__ddict['idens']=3
+            self.__ddict['r0']=6.6       # Radial distance for seeding (RE)
+            self.__ddict['mltmin']=-6.0  # Minimum local time for seeding region (HOURS)
+            self.__ddict['mltmax']=6.0   # Maximum local time for seeding region (HOURS)
 
-  Jesse Woodroffe
-  6/7/2016
+    def get_interactive_input(self):
+        """
+        Set parameter inputs using interactive prompts. These quantities need to have more informative messages
+        associated with them, but the infrastructure is functional.
+        """
 
-  """
+        prompt1="Please follow prompts to set parameters for PTM simulation"
+        prompt2="Step 1: Set global simulation parameters"
+        prompt3="Step 2: Set parameters for configuration space"
+        prompt4="Step 3: Set parameters for velocity space"
+        prompt5="Create input files? (Y/N)\n"
 
-  # Change these parameter defaults as appropriate for your application.
+        print '*'*len(prompt1)
+        print prompt1
+        print '*'*len(prompt1)
 
-  # Default parameters for ptm_parameters file.
-  pdict={}
-  pdict['runid']=1
-  pdict['nparticles']=1   # Number of particles to use in simulation
-  pdict['ndim']=3         # Number of spatial dimensions of input data (2 or 3)
-  pdict['nx']=75          # Number of points in X grid
-  pdict['ny']=75          # Number of points in Y grid
-  pdict['nz']=75          # Number of points in Z grid
-  pdict['itrace']=-1      # 1 = forward in time, -1 = backwards in time
-  pdict['ifirst']=1       # Timestep of first fields snapshot: e.g., start at bx3d_0005.bin if ifirst=5
-  pdict['ilast']=2        # Timestep of last fields snapshot: e.g., finish at bx3d_0009.bin if ilast=9
-  pdict['ntot']=2         # Total number of time steps in tgrid file
-  pdict['dtin']=3600.0    # Time between snapshots (seconds). If dtin<0, read times from tgrid.bin
-  pdict['dtout']=1.0      # Time between data outputs (seconds)
-  pdict['istep']=1        # Integrator to use: 1=RK4, 2=Adaptive RKSuite
-  pdict['iswitch']=-1     # Particle equations to solve: -1=guiding center, 0=dynamic switching, 1=full orbit
-  pdict['iphase']=3       # Gyrophase switching method: 1=random, 2=brute force search, 3=gradient method
-  pdict['nphase']=32      # Number of points for brute force search (minimize difference in B)
-  pdict['charge']=-1.0    # Particle charge in multiples of fundamental
-  pdict['mass']=1.0       # Particle mass in multiples of the electron mass
-  pdict['tlo']=0.0        # Lowest time of particle trace
-  pdict['thi']=3600.0     # Highest time of particle trace
-  pdict['itraj']=0        # Write particle trajectories if in flux map mode: 0 = no, 1 = yes
+        runid=input("\nEnter run identification number (positive integer)\n")
+        idens=input("\nEnter configuration type (1=point,2=cubic domain,3=cirular region)\n")
+        idist=input("\nEnter distribution type (1=ring,2=Maxwellian,3=Uniform FluxMap,4=Non-uniform FluxMap)\n")
 
-  # Default parameters for velocity file
-  vdict={}
+        # Get parameter lists for these options
+        self.__init__(runid=runid,idensity=idens,ivelocity=idist)
 
-  vdict['idist']=ivelocity
-  if(ivelocity==1):
-    # Ring
-    vdict['idist']=1
-    vdict['ekev']=100.0     # Particle energy in keV
-    vdict['alpha']=90.0     # Particle pitch angle in degrees
-    vdict['phi']=180.0      # Particle gyrophase angle in degrees; set negative to seed randomly
-  elif(ivelocity==2):
-    # Bi-Maxwellian
-    vdict['idist']=2
-    vdict['vtperp']=0.25*__ckm  # Perpendicular thermal velocity in km/s
-    vdict['vtpara']=0.25*__ckm  # Parallel thermal velocity in km/s
-    vdict['phi']=180.0        # Gyrophase angle in degrees; set negative to seed randomly
-  elif(ivelocity==3):
-    # Uniform flux map mode
-    vdict['idist']=3
-    vdict['nenergy']=34       # Number of energies to use in discrete flux map
-    vdict['npitch']=31        # Number of pitch angles to use in discrete flux map
-    vdict['phi']=180.0        # Gyrophase angle in degrees; set negative to seed randomly
-    vdict['emin']=1.0         # Lowest energy of flux map (keV)
-    vdict['emax']=100.0       # Highest energy of flux map (keV)
-    vdict['pamin']=0.0        # Lowest pitch angle of flux map (degrees)
-    vdict['pamax']=90.0       # Highest pitch angle of flux map (degrees)
-    vdict['xsource']=-12.0    # XGSM distance where integration should be terminated (RE)
-  elif(ivelocity==4):
-    # User-specified flux map mode
-    vdict['idist']=3
-    vdict['nenergy']=34       # Number of energies to use in discrete flux map
-    vdict['npitch']=31        # Number of pitch angles to use in discrete flux map
-    vdict['phi']=180.0        # Gyrophase angle in degrees; set negative to seed randomly
-    vdict['xsource']=-12.0    # XGSM distance where integration should be terminated (RE)
-  else:
-    raise Exception('Option ivelocity = '+str(ivelocity)+' is not supported.')
+        # Set parameters for global simulation
+        print '*'*len(prompt2)
+        print prompt2
+        print '*'*len(prompt2)
+        for key in np.setxor1d(['runid'],self.__pkeys):
+            self.__pdict[key]=input("\n"+key+"=\n")
 
-  # Default parameters for density file
-  ddict={}
-  if(idensity==1):
-    # Single point
-    ddict['idens']=1
-    ddict['x0']=-5.0      # Initial X-position (RE)
-    ddict['y0']=0.0       # Initial Y-position (RE)
-    ddict['z0']=0.0       # Initial Z-position (RE)
-  elif(idensity==2):
-    # Cubic region
-    ddict['idensity']=2
-    ddict['xmin']=-7.0    # Minimum X-boundary of seeding region (RE)
-    ddict['xmax']=-6.0    # Maximum X-boundary of seeding region (RE)
-    ddict['ymin']=-0.5    # Minimum Y-boundary of seeding region (RE)
-    ddict['ymax']= 0.5    # Maximum Y-boundary of seeding region (RE)
-    ddict['zmin']=-0.5    # Minimum Z-boundary of seeding region (RE)
-    ddict['zmax']=0.5     # Maximum Z-boundary of seeding region (RE)
-  elif(idensity==3):
-    # Radial distance
-    ddict['idens']=3
-    ddict['r0']=6.6       # Radial distance for seeding (RE)
-    ddict['mltmin']=-6.0  # Minimum local time for seeding region (HOURS)
-    ddict['mltmax']=6.0   # Maximum local time for seeding region (HOURS)
+        # Set configuration space parameters
+        print '\n'+'*'*len(prompt3)
+        print prompt3
+        print '*'*len(prompt3)
+        for key in np.setxor1d(['idens'],self.__dkeys[self.__ddict['idens']-1]):
+            self.__ddict[key]=input("\n"+key+"=\n")
 
-  ptmdict={'p':pdict,'v':vdict,'d':ddict}
+        # Set velocity space parameters
+        print '\n'+'*'*len(prompt4)
+        print prompt4
+        print '*'*len(prompt4)
+        for key in np.setxor1d(['idist'],self.__vkeys[self.__vdict['idist']-1]):
+            self.__vdict[key]=input("\n"+key+"=\n")
 
-  return ptmdict
+        # Decide whether to create output files
 
-def create_input_files(pf,filedir=''):
-  """
-  Use a user-provided parameter dictionary to write the ptm input files. The get_default_inputs routine can be used
-  to get a template for this dictionary, and individual components can be modified before passing that dictionary
-  to this routine.
+        print '\n'+'*'*len(prompt5)
+        yesno = input(prompt5)
 
-  * * * * * * * * * *
-  ----------
-  | INPUTS |
-  ----------
+        if(yesno[0].upper()=='Y'):
+            self.create_input_files()
 
-  pf    Dictionary    Contains specification of all the parameters for creation of ptm input files:
+        return
 
-  1. ptm_parameters_xxxx.dat
-  2. dist_velocity_xxxx.dat
-  3. dist_density_xxxx.dat
+    def set_parameters(self,**kwargs):
+        """
+        Change internal parameter settings
+        """
 
-  filedir   String  Optional    Directory (relative or absolute) where output files should be written.
+        if('runid' in kwargs.keys()):
+            self.__pdict['runid']=kwargs['runid']
 
-  See description of individual parameters in <get_default_inputs>
+        pdict=self.__pdict.copy()
+        ddict=self.__ddict.copy()
+        vdict=self.__vdict.copy()
 
-  -----------
-  | OUTPUTS |
-  -----------
+        replace_D = False
+        replace_V = False
 
-   None. Three text files are created but the routine returns a null value.
+        if('idens' in kwargs.keys()):
+            idens=kwargs['idens']
+            replace_D = True
+        else:
+            idens=ddict['idens']
 
-  * * * * * * * * * *
+        if('idist' in kwargs.keys()):
+            idist=kwargs['idist']
+            replace_V = True
+        else:
+            idist=vdict['idist']
 
-  Jesse Woodroffe
-  6/7/2016
+        # Change parameter sets if appropriate and put back values that should not change
+        if(replace_D or replace_V):
 
-  Last modified 3/24/2017: Simplified routines with new key lists instead of multiple explicit writes. Also
-  changed print statements to use string formatting methods.
-  """
+            self.__init__(runid=pdict['runid'],idensity=idens,ivelocity=idist)
 
-  # Handle a couple of special cases
-  if(len(filedir)>0):
-    if(filedir=='.'):
-      # User specified present directory using dot; strip the dot
-      fileir=''
-    elif(filedir[-1]!='/'):
-      # User forgot to add a slash at the end of the directory name; add a slash
-      filedir+='/'
+            for key,value in pdict.iteritems():
+                if(key in self.__pkeys):
+                    self.__pdict[key]=value
+            for key,value in ddict.iteritems():
+                if(key in self.__dkeys):
+                    self.__ddict[key]=value
+            for key,value in vdict.iteritems():
+                if(key in self.__vkeys):
+                    self.__vdict[key]=value
 
-  # Output filenames
-  pfname='{}ptm_parameters_{:04d}.txt'.format(filedir,pf['p']['runid'])
-  dfname='{}dist_density_{:04d}.txt'.format(filedir,pf['p']['runid'])
-  vfname='{}dist_velocity_{:04d}.txt'.format(filedir,pf['p']['runid'])
+        # Set values from user input
+        for key,value in kwargs.iteritems():
+            if(key in self.__pkeys):
+                self.__pdict[key]=value
+            for dkeys in self.__dkeys:
+                if(key in dkeys):
+                    self.__ddict[key]=value
+            for vkeys in self.__vkeys:
+                if(key in vkeys):
+                    self.__vdict[key]=value
 
-  # The xfkeys lists give the name of all keys from the appropriate structure that
-  # will be written to the corresponding output files and they provide the order
-  # in which these will be written.
+        return
 
-  # Write the parameter file
-  with open(pfname,'w') as pfile:
-      # Set the order of parameters to be output
-      pfkeys = ['runid','nparticles','ndim','nx','ny','nz','itrace','ifirst','ilast','ntot','dtin','dtout',
-                'istep','iswitch','iphase','nphase','charge','mass','tlo','thi','itraj']
-      for key in pfkeys:
-        pfile.write('{:<8g} {}\n'.format(pf['p'][key],key))
+    def print_settings(self):
+        """
+        Print out a summary of internal parameters
+        """
 
-  # Write the density file, dist_density_xxxx.dat
-  with open(dfname,'w') as dfile:
-      # Set the output parameters and their order based on the specified spatial distribution
-      if(  pf['d']['idens']==1):
-        dfkeys = ['idens','x0','y0','z0']
-      elif(pf['d']['idens']==2):
-        dfkeys = ['idens','xmin','xmax','ymin','ymax','zmin','zmax']
-      elif(pf['d']['idens']==3):
-        dfkeys = ['idens','r0','mltmin','mltmax']
-      else:
-        raise Exception('Density type {:d} is not supported'.format(pf['d']['idens']))
-      for key in dfkeys:
-        dfile.write('{:<8g} {}\n'.format(pf['d'][key],key))
+        print "*********************"
+        print "Simulation Parameters"
+        print "*********************"
+        for key in self.__pkeys:
+            print '{:<12}{:>8}'.format(key, self.__pdict[key])
+        print ""
+        print "******************************"
+        print "Configuration Space Parameters"
+        print "******************************"
+        for key in self.__dkeys[self.__ddict['idens']-1]:
+            print '{:<12}{:>8}'.format(key, self.__ddict[key])
+        print ""
+        print "*************************"
+        print "Velocity Space Parameters"
+        print "*************************"
+        for key in self.__vkeys[self.__vdict['idist']-1]:
+            print '{:<12}{:>8}'.format(key, self.__vdict[key])
 
-  # Write velocity distribution function file, dist_velocity_xxxx.dat
-  with open(vfname,'w') as vfile:
-      # Set the output parameters and their order based on the specified velocity distribution
-      if(  pf['v']['idist']==1):
-        vfkeys = ['idist','ekev','alpha','phi']
-      elif(pf['v']['idist']==2):
-        vfkeys = ['idist','vtperp','vtpara','phi']
-      elif(pf['v']['idist']==3):
-        vfkeys = ['idist','nenergy','npitch','phi','emin','emax','pamin','pamax','xsource']
-      elif(pf['v']['idist']==4):
-        vfkeys = ['idist','nenergy','npitch','phi','xsource']
-      else:
-        raise Exception('Distribution type {:d} is not supported'.format(pf['v']['idist']))
-      for key in vfkeys:
-        vfile.write('{:<8g} {}\n'.format(pf['v'][key],key))
+        return
 
-  return
+    def create_input_files(self,filedir=''):
+        """
+        Write the output files
+        """
+
+        # Handle a couple of special cases
+        if(len(filedir)>0):
+            if(filedir=='.'):
+                # User specified present directory using dot; strip the dot
+                fileir=''
+            elif(filedir[-1]!='/'):
+                # User forgot to add a slash at the end of the directory name; add a slash
+                filedir+='/'
+
+        # Output filenames
+        pfname='{}ptm_parameters_{:04d}.txt'.format(filedir,self.__pdict['runid'])
+        dfname='{}dist_density_{:04d}.txt'.format(filedir,self.__pdict['runid'])
+        vfname='{}dist_velocity_{:04d}.txt'.format(filedir,self.__pdict['runid'])
+
+        # The [x]dfkeys lists give the name of all keys from the appropriate structure that
+        # will be written to the corresponding output files and they provide the order
+        # in which these will be written.
+
+        # Write the parameter file
+        with open(pfname,'w') as pfile:
+            # Set the order of parameters to be output
+            self.__pfkeys = ['runid','nparticles','ndim','nx','ny','nz','itrace','ifirst','ilast','ntot','dtin','dtout',
+                    'istep','iswitch','iphase','nphase','charge','mass','tlo','thi','itraj']
+            for key in self.__pfkeys:
+                pfile.write('{:<8g} {}\n'.format(self.__pdict[key],key))
+
+        # Write the density file, dist_density_xxxx.dat
+        with open(dfname,'w') as dfile:
+            # Set the output parameters and their order based on the specified spatial distribution
+            if(  self.__ddict['idens']==1):
+                dfkeys = ['idens','x0','y0','z0']
+            elif(self.__ddict['idens']==2):
+                dfkeys = ['idens','xmin','xmax','ymin','ymax','zmin','zmax']
+            elif(self.__ddict['idens']==3):
+                dfkeys = ['idens','r0','mltmin','mltmax']
+            else:
+                raise Exception('Density type {:d} is not supported'.format(self.__ddict['idens']))
+            for key in dfkeys:
+                dfile.write('{:<8g} {}\n'.format(self.__ddict[key],key))
+
+        # Write velocity distribution function file, dist_velocity_xxxx.dat
+        with open(vfname,'w') as vfile:
+            # Set the output parameters and their order based on the specified velocity distribution
+            if(  self.__vdict['idist']==1):
+                vfkeys = ['idist','ekev','alpha','phi']
+            elif(self.__vdict['idist']==2):
+                vfkeys = ['idist','vtperp','vtpara','phi']
+            elif(self.__vdict['idist']==3):
+                vfkeys = ['idist','nenergy','npitch','phi','emin','emax','pamin','pamax','xsource']
+            elif(self.__vdict['idist']==4):
+                vfkeys = ['idist','nenergy','npitch','phi','xsource']
+            else:
+                raise Exception('Distribution type {:d} is not supported'.format(self.__vdict['idist']))
+            for key in vfkeys:
+                vfile.write('{:<8g} {}\n'.format(self.__vdict[key],key))
+
+        return
+
+    def mlt_to_phi(self,myMlt):
+
+        # Convert from magnetic local time in hours to azimuthal angle in degrees
+
+        if(myMlt < 12.0):
+            mlt=myMlt+24
+        else:
+            mlt=myMlt
+
+        res = 15*(mlt-12.0)
+
+        return res
+
+    def create_rungrid(self,times,positions,inSpherical=False):
+        """
+        -----------
+        Description
+        -----------
+        Given a set of initial positions and start/end times, create the appropriate set of PTM input
+        files. A reference text file is also created, which gives the time range and position for each
+        runid (the rungrid).
+
+        In the context of this routine, spherical coordinates are [L,MLT,MLAT], where L is in Earth radii, MLAT is
+        in degrees, and MLT is in hours.
+
+        ------
+        Inputs
+        ------
+        times(Nt,2)             array or list       First column gives start times, second gives end times
+        positions(Nr,3)         array or list       First column gives x-pos, second gives y-pos, third gives z-pos
+        isSpherical             logical             Whether coordinates are in spherical (True) or Cartesian (False)
+                                                    If true, see note on spherical coordinates above.
+
+        -------
+        Outputs
+        -------
+        None        Creates text files for run inputs and a rungrid file
+
+
+        ------
+        Author
+        ------
+        Jesse Woodroffe
+        jwoodroffe@lanl.gov
+
+        """
+
+        if(inSpherical):
+            ph=__dtor*np.array([self.mlt_to_phi(mlt) for mlt in positions[:,1]])
+            th=__dtor*(90.0-positions[:,2])
+            r=positions[:,0]*np.sin(th)**2
+            x=r*np.sin(th)*np.cos(ph)
+            y=r*np.sin(th)*np.sin(ph)
+            z=r*np.cos(th)
+        else:
+            x=np.array(positions[:,0])
+            y=np.array(positions[:,1])
+            z=np.array(positions[:,2])
+
+        tstart = np.array(times[:,0])
+        tstop = np.array(times[:,1])
+
+        with open('rungrid.txt','w') as f:
+            myid=0
+            f.write('{:<8}{:<8}{:<8}{:<8}{:<8}{:<8}\n'.format('RunID','tLo','tHi','x0','y0','z0'))
+            for i in xrange(tstart.size):
+                for j in xrange(x.size):
+                    myid+=1
+                    f.write('{:<8}{:<8}{:<8}{:<8}{:<8}{:<8}\n'.format(myid,tstart[i],tstop[i],x[j],y[j],z[j]))
+                    self.set_parameters(runid=myid,x0=x[j],y0=y[j],z0=z[j],tlo=tstart[i],thi=tstop[i])
+                    self.create_input_files()
+
+        return
