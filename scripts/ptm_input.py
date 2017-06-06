@@ -351,7 +351,7 @@ class ptm_input_creator(object):
         files. A reference text file is also created, which gives the time range and position for each
         runid (the rungrid).
 
-        In the context of this routine, spherical coordinates are [L,MLT,MLAT], where L is in Earth radii, MLAT is
+        In the context of this routine, spherical coordinates are [R,MLT,MLAT], where R is in Earth radii, MLAT is
         in degrees, and MLT is in hours.
 
         ------
@@ -397,7 +397,7 @@ class ptm_input_creator(object):
             for i in xrange(tstart.size):
                 for j in xrange(x.size):
                     myid+=1
-                    f.write('{:<8}{:<8}{:<8}{:<8}{:<8}{:<8}\n'.format(myid,tstart[i],tstop[i],x[j],y[j],z[j]))
+                    f.write('{:<8}{:<8}{:<8}{:<8}{:<8}{:<8}\n'.format(myid,tstart[i],tstop[i],positions[j,0],positions[j,1],positions[j,2]))
                     self.set_parameters(runid=myid,x0=x[j],y0=y[j],z0=z[j],tlo=tstart[i],thi=tstop[i])
                     self.create_input_files()
 

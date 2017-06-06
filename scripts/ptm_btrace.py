@@ -37,13 +37,13 @@ from scipy import optimize
 from scipy import integrate
 from scipy import interpolate
 
-__dtor = np.pi/180.0
-__rtod = 180.0/np.pi
-
 class gridded_magnetic_field(object):
   """
   Base object for SWMF field line tracing
   """
+
+  __dtor = np.pi/180.0
+  __rtod = 180.0/np.pi
 
   def __init__(self,istep=None,searchdir=None):
 
@@ -60,14 +60,6 @@ class gridded_magnetic_field(object):
       else:
         self.__searchdir=searchdir
 
-    self.__get_grid()
-    self.__get_fields()
-
-  def __get_grid(self):
-    """
-    Read in spatial grids and set parameters
-    """
-
     self.__xgrid=np.fromfile(self.__searchdir+'xgrid.bin')
     self.__ygrid=np.fromfile(self.__searchdir+'ygrid.bin')
     self.__zgrid=np.fromfile(self.__searchdir+'zgrid.bin')
@@ -75,18 +67,15 @@ class gridded_magnetic_field(object):
     self.__ny=self.__ygrid.size
     self.__nz=self.__zgrid.size
 
-  def __get_fields(self):
-    """
-    Read in magnetic fields and create some inquiry functions.
-    """
-
     bdims=(self.__nx,self.__ny,self.__nz)
+
     self.__bx=np.fromfile(self.__searchdir+'bx3d_%4.4i.bin' % self.__istep).reshape(bdims)
     self.__by=np.fromfile(self.__searchdir+'by3d_%4.4i.bin' % self.__istep).reshape(bdims)
     self.__bz=np.fromfile(self.__searchdir+'bz3d_%4.4i.bin' % self.__istep).reshape(bdims)
-    bxi=interpolate.RegularGridInterpolator(self.__xgrid,self.__ygrid,self.__zgrid,self.__bx)
-    byi=interpolate.RegularGridInterpolator(self.__xgrid,self.__ygrid,self.__zgrid,self.__by)
-    bzi=interpolate.RegularGridInterpolator(self.__xgrid,self.__ygrid,self.__zgrid,self.__bz)
+
+    bxi=interpolate.RegularGridInterpolator((self.__xgrid,self.__ygrid,self.__zgrid),self.__bx)
+    byi=interpolate.RegularGridInterpolator((self.__xgrid,self.__ygrid,self.__zgrid),self.__by)
+    bzi=interpolate.RegularGridInterpolator((self.__xgrid,self.__ygrid,self.__zgrid),self.__bz)
 
     def bhat_ode(s,xv):
       bhat=np.r_[bxi(xv),byi(xv),bzi(xv)]
@@ -153,9 +142,9 @@ class gridded_magnetic_field(object):
     """
 
     phi=self.__mlt_to_phi(mlt)
-    x0=rad*np.cos(__dtor*phi)*cos(__dtor*lat)
-    y0=rad*np.sin(__dtor*phi)*cos(__dtor*lat)
-    z0=rad*np.sin(__dtor*lat)
+    x0=rad*np.cos(self.__dtor*phi)*cos(self.__dtor*lat)
+    y0=rad*np.sin(self.__dtor*phi)*cos(self.__dtor*lat)
+    z0=rad*np.sin(self.__dtor*lat)
 
     swant=np.arange(0.0,smax,ds)
     ics=r_[x0,y0,z0]
@@ -180,9 +169,9 @@ class gridded_magnetic_field(object):
     """
 
     phi=self.__mlt_to_phi(mlt)
-    x0=rad*np.cos(__dtor*phi)*np.cos(__dtor*lat)
-    y0=rad*np.sin(__dtor*phi)*np.cos(__dtor*lat)
-    z0=rad*np.sin(__dtor*lat)
+    x0=rad*np.cos(self.__dtor*phi)*np.cos(self.__dtor*lat)
+    y0=rad*np.sin(self.__dtor*phi)*np.cos(self.__dtor*lat)
+    z0=rad*np.sin(self.__dtor*lat)
 
     xp=np.zeros([istep_max])
     yp=np.zeros_like(xp)
@@ -328,9 +317,9 @@ class gridded_magnetic_field(object):
     minlat=optimize.newton(rtfun,lat,tol=1e-3)
 
     phi = self.__mlt_to_phi(mlt)
-    x = r0*np.cos(__dtor*minlat)*np.cos(__dtor*phi)
-    y = r0*np.cos(__dtor*minlat)*np.sin(__dtor*phi)
-    z = r0*np.sin(__dtor*minlat)
+    x = r0*np.cos(self.__dtor*minlat)*np.cos(self.__dtor*phi)
+    y = r0*np.cos(self.__dtor*minlat)*np.sin(self.__dtor*phi)
+    z = r0*np.sin(self.__dtor*minlat)
 
     pos = np.r_[x,y,z]
     return pos
@@ -358,10 +347,10 @@ class gridded_magnetic_field(object):
       for ilev in xrange(rlev):
 
         # Parameterize the arc
-        latv=__dtor*np.linspace(lmin,lmax,numpts)
+        latv=self.__dtor*np.linspace(lmin,lmax,numpts)
 
-        xv=r0*np.cos(latv)*np.cos(__dtor*phi)
-        yv=r0*np.cos(latv)*np.sin(__dtor*phi)
+        xv=r0*np.cos(latv)*np.cos(self.__dtor*phi)
+        yv=r0*np.cos(latv)*np.sin(self.__dtor*phi)
         zv=r0*np.sin(latv)
 
         bmat=np.zeros([latv.size,4])
@@ -375,16 +364,16 @@ class gridded_magnetic_field(object):
         imin=np.argmin(bmat[:,-1])
         isub=imin-2 if imin>2 else 0
         iadd=imin+2 if imin<numpts-3 else numpts-1
-        lmin=__rtod*latv[isub]
-        lmax=__rtod*latv[iadd]
+        lmin=self.__rtod*latv[isub]
+        lmax=self.__rtod*latv[iadd]
 
       xr,yr,zr = xv[imin], yv[imin], zv[imin]
 
     else:
 
-      xr=r0*np.cos(__dtor*lat0)*np.cos(__dtor*phi)
-      yr=r0*np.cos(__dtor*lat0)*np.sin(__dtor*phi)
-      zr=r0*np.sin(__dtor*lat0)
+      xr=r0*np.cos(self.__dtor*lat0)*np.cos(self.__dtor*phi)
+      yr=r0*np.cos(self.__dtor*lat0)*np.sin(self.__dtor*phi)
+      zr=r0*np.sin(self.__dtor*lat0)
 
     return xr, yr, zr
 
@@ -408,15 +397,15 @@ class gridded_magnetic_field(object):
     c=mhat[2]
 
     # Determine the location by enforcing planar and fixed distance constraints
-    phi = self.__mlt_to_phi(mlt)*__dtor
+    phi = self.__mlt_to_phi(mlt)*self.__dtor
     rho=r*np.abs(c)/np.sqrt((a*np.cos(phi)+b*np.sin(phi))**2+c**2)
     x=rho*np.cos(phi)
     y=rho*np.sin(phi)
     z=r*(a*np.cos(phi)+b*np.sin(phi))/sqrt((a*np.cos(phi)+b*np.sin(phi))**2+c**2)
 
     # Return the data
-    lat=np.arcsin(z/r)*__rtod
-    azm=phi*__rtod
+    lat=np.arcsin(z/r)*self.__rtod
+    azm=phi*self.__rtod
 
     return lat,azm
 
@@ -429,7 +418,7 @@ class gridded_magnetic_field(object):
     """
     pos=self.__find_field_line_arc(r0,mlt,arcSize=arcSize,numpts=numpts,rlev=rlev,smplane=smplane)
     if(refine):
-      lat=__rtod*np.arcsin(pos[2]/linalg.norm(pos))
+      lat=self.__rtod*np.arcsin(pos[2]/linalg.norm(pos))
       try:
         pos=self.__find_field_line_root(mlt,r0,lat,ds=refine_ds,smax=smax)
       except: # Occasionally higher resolution is required to get a convergent solution
