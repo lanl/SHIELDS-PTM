@@ -5,6 +5,13 @@ from scipy import special
 from scipy import linalg
 
 class ptm_postprocessor(object):
+
+    __ckm = 2.998e5
+    __csq = 8.988e10
+    __mc2 = 5.11e2
+    __dtor = np.pi/180.0
+    __rtod = 180.0/np.pi
+
     """
     -------
     Purpose
@@ -39,13 +46,6 @@ class ptm_postprocessor(object):
     6/6/2017    Original code
 
     """
-
-
-    __ckm = 2.998e5
-    __csq = __ckm*__ckm
-    __mc2 = 5.11e2
-    __dtor = np.pi/180.0
-    __rtod = 180.0/np.pi
 
     def __init__(self,filedir=None):
 
@@ -219,6 +219,37 @@ class ptm_postprocessor(object):
 
         return results
 
+    def seconds_to_hhmmss(self,tsec):
+        """
+        -------
+        Purpose
+        -------
+
+        Convert time in seconds [0,86400) to hours/minutes/seconds
+
+        ------
+        Inputs
+        ------
+
+        tsec        float       Time in seconds [0,86400)
+
+        -------
+        Outputs
+        -------
+
+        hh          float       Hours since tsec = 0 (even if 0 is not in tsec)
+        mm          float       Minutes of the hour [0,60)
+        ss          float       Seconds of the minute [0,60)
+        """
+
+        hh = tsec//3600
+        mm = (tsec-3600*hh)//60
+        ss = tsec-3600*hh-60*mm
+
+        return int(hh), int(mm), int(ss)
+
+    #------Here we define RAM-specific routines----->
+
     def process_ram_boundary(self,griddir=None,write_files=True,outdir=None,date={'year':2000,'month':1,'day':1}):
         """
         Rungrids are a new configuration option provided in the updated version of
@@ -246,12 +277,11 @@ class ptm_postprocessor(object):
             # This is backwards tracing, so fluxes will be calculated at the later
             # time, which is given in the third column
 
-            runids = rungrid[:,0]
+            runids = map(int,rungrid[:,0])
             times = np.unique(rungrid[:,2])
             rvals = np.unique(rungrid[:,3])
 
-            if ~np.allclose(rvals,rvals[0],1e-3):
-                print rvals
+            if not np.allclose(rvals,rvals[0],1e-3):
                 raise Exception('Error in process_ram_boundary: points are not at fixed radial distance.')
 
             fluxdata= {'rungrid':rungrid}
@@ -279,47 +309,43 @@ class ptm_postprocessor(object):
 
         cadence=(fluxdata['times'][1]-fluxdata['times'][0])//60
 
+        year = date['year']
+        month = date['month']
+        day = date['day']
+
         fname = '{:4}{:02}{:02}_ptm_geomlt_{:}-min.txt'.format(year,month,day,cadence)
 
-        nenergy=fluxdata['energies'].size
+        nenergy=fluxdata[1]['energies'].size
 
         # Header lines
         header1='# PTM Particle Fluxes for RAM\n'
         header2='# Header Format string: (a24,a6,2x,a72,36a18)\n'
         header3='# DATA   Format string: (a24,f6.1,2x,36(i2),36(f18.4))\n'
 
-        # Formatting strings
-        headFormat='{:24}{:6}  {:72}'+(nenergy*'{:18}')
-        dataFormat='{:24}{:6.1}  '+(nenergy*'{:2}')+(nenergy*'{:18}')
-        timeFormat='{:4}-{:02}-{:02}T{:02}:{:02}:{:02}.000Z'
-
         # This parameter has to be in the file but it's not used by RAM
-        nsc = np.ones([nenergy])
+        nsc = np.ones([nenergy],dtype='int')
+        nscstring=(nenergy*'{:2}').format(*nsc)
+
+        # Formatting strings
+        headFormat='{:>24}{:>6}  {:>72}'
+        dataFormat='{:6.1f}  '+nscstring+(nenergy*'{:18.4f}')
+        timeFormat='{:4}-{:02}-{:02}T{:02}:{:02}:{:02}.000Z'
 
         with open(fname,'w') as f:
 
-            f.writeline(header1);
-            f.writeline(header2);
-            f.writeline(header3);
+            f.writelines(header1);
+            f.writelines(header2);
+            f.writelines(header3);
+            f.writelines(headFormat.format('CCSDS','MLT','NSC')+(nenergy*'{:18}'+'\n').format(*fluxdata[1]['energies']))
 
             i=0
             for time in fluxdata['times']:
                 hour,minute,second = self.seconds_to_hhmmss(time)
                 for mlt in fluxdata['mlt']:
-                    saflux = fluxdata[i]['omni']/(4.0*np.pi)
-                    dataline = timeFormat.format(year,month,day,hour,minute,second)+dataFormat.format(mlt,nsc,saflux)+'\n'
-                    f.writeline(dataline)
                     i+=1
+                    saflux = fluxdata[i]['omni']/(4.0*np.pi)
+                    # Note asterisk in format statement (*np.r_), this is required for correct passing of values
+                    dataline = timeFormat.format(year,month,day,hour,minute,second)+dataFormat.format(*np.r_[mlt,saflux])+'\n'
+                    f.writelines(dataline)
 
         return
-
-    def seconds_to_hhmmss(self,tsec):
-        """
-        Convert a daily time in seconds [0,86400) to hour/minutes/seconds
-        """
-
-        hh = tsec//3600
-        mm = (tsec-3600*hours)//60
-        ss = tsec-3600*hours-60*minutes
-
-        return hh, mm, ss

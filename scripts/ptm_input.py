@@ -19,16 +19,14 @@ Jesse Woodroffe
 
 import numpy as np
 
-# Define constants for convenience
-
-__ckm = 2.998e5         # Speed of light in km/s
-__dtor = np.pi/180.0    # Convert degrees to radians
-__rtod = 180.0/np.pi    # Convert radians to degrees
-
 class ptm_input_creator(object):
     """
     An object for creating input data files for the SHIELDS-PTM code framework
     """
+
+    __ckm = 2.998e5         # Speed of light in km/s
+    __dtor = np.pi/180.0    # Convert degrees to radians
+    __rtod = 180.0/np.pi    # Convert radians to degrees
 
     # These are internal parameter sets which differ based on certain arguments.
 
@@ -333,16 +331,23 @@ class ptm_input_creator(object):
 
         # Convert from magnetic local time in hours to azimuthal angle in degrees
 
-        if(myMlt < 12.0):
-            mlt=myMlt+24
+        if np.isscalar(myMlt):
+
+            if(myMlt < 12.0):
+                mlt=myMlt+24
+            else:
+                mlt=myMlt
+
         else:
-            mlt=myMlt
+
+            mlt=myMlt.copy()
+            mlt[mlt<12.0]+=24
 
         res = 15*(mlt-12.0)
 
         return res
 
-    def create_rungrid(self,times,positions,inSpherical=False):
+    def create_rungrid(self,times,positions,isSpherical=False):
         """
         -----------
         Description
@@ -351,8 +356,8 @@ class ptm_input_creator(object):
         files. A reference text file is also created, which gives the time range and position for each
         runid (the rungrid).
 
-        In the context of this routine, spherical coordinates are [R,MLT,MLAT], where R is in Earth radii, MLAT is
-        in degrees, and MLT is in hours.
+        In the context of this routine, spherical coordinates are [R,MLT,MLAT], where R is in Earth radii, MLT is in
+        hours, and MLAT is in degrees.
 
         ------
         Inputs
@@ -376,9 +381,12 @@ class ptm_input_creator(object):
 
         """
 
-        if(inSpherical):
-            ph=__dtor*np.array([self.mlt_to_phi(mlt) for mlt in positions[:,1]])
-            th=__dtor*(90.0-positions[:,2])
+        # Particle positions in PTM are Cartesian, but coordinates in the rungrid file are
+        # provided in whatever format is sent to this routine.
+
+        if(isSpherical):
+            ph=self.__dtor*np.array([self.mlt_to_phi(mlt) for mlt in positions[:,1]])
+            th=self.__dtor*(90.0-positions[:,2])
             r=positions[:,0]*np.sin(th)**2
             x=r*np.sin(th)*np.cos(ph)
             y=r*np.sin(th)*np.sin(ph)
@@ -397,7 +405,7 @@ class ptm_input_creator(object):
             for i in xrange(tstart.size):
                 for j in xrange(x.size):
                     myid+=1
-                    f.write('{:<8}{:<8}{:<8}{:<8}{:<8}{:<8}\n'.format(myid,tstart[i],tstop[i],positions[j,0],positions[j,1],positions[j,2]))
+                    f.write('{:<8}{:<8.1f}{:<8.1f}{:<8.3f}{:<8.3f}{:<8.3f}\n'.format(myid,tstart[i],tstop[i],positions[j,0],positions[j,1],positions[j,2]))
                     self.set_parameters(runid=myid,x0=x[j],y0=y[j],z0=z[j],tlo=tstart[i],thi=tstop[i])
                     self.create_input_files()
 
