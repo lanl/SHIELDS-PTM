@@ -61,7 +61,7 @@ def parse_map_file(fname):
   Einit = np.zeros([envec.size,pavec.size])
   Efinal = np.zeros_like(Einit)
 
-  for icount in xrange(np.size(res,0)):
+  for icount in range(np.size(res,0)):
     idex = np.argwhere(res[icount,-3]==envec)
     jdex = np.argwhere(res[icount,-2]==pavec)
     Einit[idex,jdex]=res[icount,-3]
@@ -142,34 +142,6 @@ def energy_to_flux(ei,ef,ec,n,mc2=511.0,kind='kappa',kap=2.5,energyFlux=False):
 
     return j
 
-def calculate_electron_flux_1(ei,ef,x=[1.0,0.5,2.5]):
-    """
-    x[0] = density
-    x[1] = characteristic energy
-    x[2] = kappa index
-    """
-    ckm=2.998e5
-    mc2=511.0
-
-    n=x[0]
-    E=x[1]
-    kappa=x[2]
-
-    W=E*(1.0-1.5/kappa)
-
-    # Use gammaln instead of gamma to avoid overflow at large kappa
-
-    kf = np.exp(special.gammaln(kappa+1)-special.gammaln(kappa-0.5))
-    g = n*(mc2/(ckm*ckm*W*np.pi*kappa))**1.5*kf
-    f = g*(1+ei/(kappa*W))**-(kappa+1)
-
-    gamf = 1+ef/mc2
-    v = ckm*np.sqrt(gamf*gamf-1.0)/gamf
-
-    j=1e5*ckm*ckm*v*v/mc2*f
-
-    return j
-
 def calculate_electron_flux(ei,ef,x):
 
     ckm=2.998e5
@@ -201,22 +173,6 @@ def calculate_electron_flux(ei,ef,x):
     j=1e5*ckm*ckm*v*v/mc2*(f1+f2)
 
     return j
-
-def flux_root_function_1(ei,ef,pav,oflux,x):
-
-    flux = calculate_electron_flux_1(ei,ef,x)
-    omni = calculate_omnidirectional_flux(pav,flux)
-    delt = linalg.norm(np.log10(omni/oflux))
-
-    return delt
-
-def flux_root_function(ei,ef,pav,oflux,x):
-
-    flux = calculate_electron_flux(ei,ef,x)
-    omni = calculate_omnidirectional_flux(pav,flux)
-    delt = linalg.norm(np.log10(omni/oflux))
-
-    return delt
 
 def calculate_omnidirectional_flux(pav,diffJ,angleDegrees=True,symmetry=True):
     """
@@ -328,7 +284,7 @@ def tm03_moments(x,y,swD,getDefaults=False):
           bzs=0.0
       else:
           bzn=0.0
-          bzs=bz/5.0
+          bzs=-bz/5.0
 
       vsw=swD['vx']/500.0
       nsw=swD['n']/10.0
