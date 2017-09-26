@@ -18,6 +18,7 @@ Jesse Woodroffe
 """
 
 import numpy as np
+import os
 
 class ptm_input_creator(object):
     """
@@ -142,9 +143,9 @@ class ptm_input_creator(object):
         prompt4="Step 3: Set parameters for velocity space"
         prompt5="Create input files? (Y/N)\n"
 
-        print '*'*len(prompt1)
-        print prompt1
-        print '*'*len(prompt1)
+        print('*'*len(prompt1))
+        print(prompt1)
+        print('*'*len(prompt1))
 
         runid=input("\nEnter run identification number (positive integer)\n")
         idens=input("\nEnter configuration type (1=point,2=cubic domain,3=cirular region)\n")
@@ -154,29 +155,29 @@ class ptm_input_creator(object):
         self.__init__(runid=runid,idensity=idens,ivelocity=idist)
 
         # Set parameters for global simulation
-        print '*'*len(prompt2)
-        print prompt2
-        print '*'*len(prompt2)
+        print('*'*len(prompt2))
+        print(prompt2)
+        print('*'*len(prompt2))
         for key in np.setxor1d(['runid'],self.__pkeys):
             self.__pdict[key]=input("\n"+key+"=\n")
 
         # Set configuration space parameters
-        print '\n'+'*'*len(prompt3)
-        print prompt3
-        print '*'*len(prompt3)
+        print('\n'+'*'*len(prompt3))
+        print(prompt3)
+        print('*'*len(prompt3))
         for key in np.setxor1d(['idens'],self.__dkeys[self.__ddict['idens']-1]):
             self.__ddict[key]=input("\n"+key+"=\n")
 
         # Set velocity space parameters
-        print '\n'+'*'*len(prompt4)
-        print prompt4
-        print '*'*len(prompt4)
+        print('\n'+'*'*len(prompt4))
+        print(prompt4)
+        print('*'*len(prompt4))
         for key in np.setxor1d(['idist'],self.__vkeys[self.__vdict['idist']-1]):
             self.__vdict[key]=input("\n"+key+"=\n")
 
         # Decide whether to create output files
 
-        print '\n'+'*'*len(prompt5)
+        print('\n'+'*'*len(prompt5))
         yesno = input(prompt5)
 
         if(yesno[0].upper()=='Y'):
@@ -216,18 +217,18 @@ class ptm_input_creator(object):
 
             self.__init__(runid=pdict['runid'],idensity=idens,ivelocity=idist)
 
-            for key,value in pdict.iteritems():
+            for key,value in pdict.items():
                 if(key in self.__pkeys):
                     self.__pdict[key]=value
-            for key,value in ddict.iteritems():
+            for key,value in ddict.items():
                 if(key in self.__dkeys):
                     self.__ddict[key]=value
-            for key,value in vdict.iteritems():
+            for key,value in vdict.items():
                 if(key in self.__vkeys):
                     self.__vdict[key]=value
 
         # Set values from user input
-        for key,value in kwargs.iteritems():
+        for key,value in kwargs.items():
             if(key in self.__pkeys):
                 self.__pdict[key]=value
             for dkeys in self.__dkeys:
@@ -244,23 +245,23 @@ class ptm_input_creator(object):
         Print out a summary of internal parameters
         """
 
-        print "*********************"
-        print "Simulation Parameters"
-        print "*********************"
+        print("*********************")
+        print("Simulation Parameters")
+        print("*********************")
         for key in self.__pkeys:
-            print '{:<12}{:>8}'.format(key, self.__pdict[key])
-        print ""
-        print "******************************"
-        print "Configuration Space Parameters"
-        print "******************************"
+            print('{:<12}{:>8}'.format(key, self.__pdict[key]))
+        print("")
+        print("******************************")
+        print("Configuration Space Parameters")
+        print("******************************")
         for key in self.__dkeys[self.__ddict['idens']-1]:
-            print '{:<12}{:>8}'.format(key, self.__ddict[key])
-        print ""
-        print "*************************"
-        print "Velocity Space Parameters"
-        print "*************************"
+            print('{:<12}{:>8}'.format(key, self.__ddict[key]))
+        print("")
+        print("*************************")
+        print("Velocity Space Parameters")
+        print("*************************")
         for key in self.__vkeys[self.__vdict['idist']-1]:
-            print '{:<12}{:>8}'.format(key, self.__vdict[key])
+            print('{:<12}{:>8}'.format(key, self.__vdict[key]))
 
         return
 
@@ -402,11 +403,38 @@ class ptm_input_creator(object):
         with open('rungrid.txt','w') as f:
             myid=0
             f.write('{:<8}{:<8}{:<8}{:<8}{:<8}{:<8}\n'.format('RunID','tLo','tHi','x0','y0','z0'))
-            for i in xrange(tstart.size):
-                for j in xrange(x.size):
+            for i in range(tstart.size):
+                for j in range(x.size):
                     myid+=1
                     f.write('{:<8}{:<8.1f}{:<8.1f}{:<8.3f}{:<8.3f}{:<8.3f}\n'.format(myid,tstart[i],tstop[i],positions[j,0],positions[j,1],positions[j,2]))
                     self.set_parameters(runid=myid,x0=x[j],y0=y[j],z0=z[j],tlo=tstart[i],thi=tstop[i])
                     self.create_input_files()
 
         return
+
+if __name__ == "__main__":
+
+    """
+    This is an example routine that creates a default input object and uses it to make a rungrid
+    """
+
+    pic = ptm_input_creator()
+    R = 6.6
+    MLT = np.arange(24)
+    th = (np.pi/180.0)*np.array([rc.mlt_to_phi(lt) for lt in MLT])
+    pos = np.zeros([24,3])
+    pos[:,0] = R*np.cos(th)
+    pos[:,1] = R*np.sin(th)
+    tstart = 18000+300*np.arange(48)
+    tstop = tstart+7200.0
+    times = np.c_[tstart,tstop]
+
+    try:
+        os.mkdir('test_rungrid')
+        print("Creating test_rungrid subdirectory")
+    except:
+        print("Existing test_rungrid subdirectory will be used")
+
+    os.chdir('test_rungrid')
+
+    pic.create_rungrid(times,pos)
