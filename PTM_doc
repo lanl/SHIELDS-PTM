@@ -1,0 +1,212 @@
+
+
+A. Preparing PTM input files
+
+   Python3 scripts to prepare PTM input files are in directory scripts/
+   1. "module load" any of the python3/anaconda modules
+   2. "python ptm_tec_interp.py" to create PTM input files in dir ptm_data/
+   3. "python ptm_input.py"      to create PTM input files in dir ptm_input/
+
+   Module "PTM_TEC_INTERP.py"
+   1. creates in directory ptm_data/
+      a. a time-array "tgrid.bin" with epochs of all input n>1 .mhd files (select their cadence "dtout"),
+        (this time-grid will be used only if dtIn=<0 in file "ptm_paramaters", see below for PTM input).
+      b. a uniform "x/y/zgrid.bin" for E&B (choose wanted spatial grid, in RE units).
+   2. calls "ptm_read.py" to read input ascii files ".mhd" (at all n epochs) and create a dictionary.   
+      Currently, the first nheader=5 lines of that input file are skipped, adjust accordingly.
+      The input .mhd file must have following variables in this order
+       x   y   z   rho    ux   uy   uz    bx  by  bz   P    jx     jy     jz
+      and in these units
+       RE  RE  RE  Mp/cc  km/s km/s km/s  nT  nT  nT   nPa  muA/m2 muA/m2 muA/m2
+   3. calls function "gauss_interp_EB" of module "ptm_interpolate.py"
+      a. to interpolate B from the SWMF mesh (of .mhd) to the uniform grid above
+         and write files "b(x,y,z)3d_000n.bin" at all n input epochs
+      b. to calculate electric field E=-uxB and write files "e(x,y,z)3d_000n.bin"
+
+   Module "PTM_INPUT.py":
+                Better to run it interactively: []python
+                            >>> import ptm_input
+                            >>> p=ptm_input.ptm_input_creator()
+                            >>> p.create_input_files()
+                after selecting parameters on line 46: def __init__(self,runid=1,idensity=1,ivelocity=1)
+   outputs in directory ptm_input/
+    a. file "ptm_parameters_000N.txt" with N=runid above containing global pars:
+         number of particles, number of x,y,z cells, number of timesteps
+         cadence in output trajectory file ptm_output/ptm_000N.dat
+         cadence of input E&B files ptm_data/ebxyz_000N.bin
+         indices ifirst and ilast of first/last epochs of E&B files to be read by PTM, ETC
+       IMPORTANT:  Choose these global pars in "ptm_input.py" !!!!!!!!!!!!!!!
+    b. file "dist_density_000N.txt" with parameters for the spatial distribution:
+       first line:
+         idens=1 -> single-location in RE
+         idens=2 -> cube corners in RE
+         idens=3 -> fixed radial distance in RE in equatorial plane, MLT range in h
+    c. file "dist_velocity_000N.txt" with parameters for the energy/PA distributions:
+       first line:
+         idist=1 -> single E/keV, single PA/deg, single or random phase angle
+         idist=2 -> vtperp and vtpara in km/s, single or random phase angle
+         idist=3 -> uniform flux map mode: # of Es, # of PAs, gyropase, low/high E/PA of flux map
+         idist=4 -> user-specified flux map mode: as above (first three)
+
+   IMPORTANT: Alternatively, you can just edit existing files in dir ptm_input/
+
+
+-----------------------------------------------
+
+B. To run PTM:
+
+   load module gfortran if needed and if you can find it
+   "make all" to create executable "ptm"
+   transfer global/dist files from scripts/ptm_input to dir ptm_input/ of current dir (where PTM code resides)
+   transfer E&B data    files from scripts/ptm_data  to dir ptm_data/  of current dir
+   (unless you want all PTM modules and Python scripts to reside in same dir, which can be messy)
+   "./ptm N" will
+     1. read input files in directory ptm_input/ ending in 000N.txt
+     2. write output file ptm_output/ptm_000N.dat (create directory ptm_output)
+
+  On Scheme, to integrate particle motion over 3600s (SKM claims that that corresponds to approximately 1 hour), 
+  PTM takes 2*(100-PA_deg) sec (sic!), 2/3 of that on HPC/grizzly.
+
+
+ I. INPUT
+
+    The SHIELDS-PTM simulation is configured using following files:
+
+ 1a. General parameters are in file "ptm_input/ptm_parameters_000N.txt"
+   called by subroutine "read_ptm_parameters" in module FILEIO
+   sets global parameters for simulation (see above)
+
+ 1b. Particle spatial distribution is in file "ptm_input/dist_density_000N.txt"
+   called by subroutine "particle_initialize" in module PARTICLES
+   (particle location goes into object myParticle%x)
+   cases on first line:
+     idens=1 -> single-location
+     idens=2 -> random seeding in a cube
+     idens=3 -> random MLT and fixed radial distance in equatorial plane
+   there is no user-specified spatial distribution
+
+ 1c. Particle energy/PA distribution is in file "ptm_input/dist_velocity_000N.txt"
+   called by subroutine "particle_initialize" in module PARTICLES
+   (to initialize vpara and vperp distributions of object myParticle%v in Cartesian XYZ coordinates,
+      for use in orbit equations (iswitch=1 in file ptm_pars))
+   cases on first line:
+      idist=1 -> monoenergetic particles, single PA
+      idist=2 -> Maxwellian distribution
+      idist=3 -> uniform distribution in E and PA (uniform flux map mode)
+      idist=4 -> user-specified flux map mode (Es and PAs in input files energies.bin and pitchangles.bin)
+
+ 1d. Time/Space grids and EM field input data (at least two epochs) are in dir "ptm_data/"
+    files read with interface "read_array" in module GLOBAL (data stored in "C-style")
+
+    1d1. Files "ptm_data/x,y,zgrid.bin" contain linear spatial grid read by subroutine "fields_initialize" in module FIELDS
+       In file "ptm_parameters", dtIn is the cadence of E&B input files.
+       If dtIn>0, then time-grid (for E&B) is constructed linearly between Tmin=0 and Tmax=dtIn*nt, 
+         with nt = ilast-ifirst (from ptm_pars) = number of E&B input files
+       If dtIn=<0, then time-grid (for E&B) Tmin-Tmax is read from file "ptm_data/tgrid.bin" 
+
+    1d2. Files "ptm_data/(b,e)(x,y,z)3d_000N.bin" contain E&B at epochs from N=ifirst to N=ilast (see ptm_pars)
+       They are read by subroutine "fields_initialize" in module FIELDS
+       Subroutine "get_fields" in module FIELDS calculates B and E
+         at any point in the simulation cube through interpolation (calls subroutine tricubic_interpolate in module INTERPOLATION)
+         at each timestep though linear interpolation
+
+ II. NUMERICAL CALCULATIONS
+
+ PTM time-advancing.
+ PTM calls subroutine "stepper_push" to advance the particle by the output-file cadence dtOut (set in file ptm_parameters).
+After each dtOut, particle position and velocity (converted to lab-frame from GC or FO) are stored for output.
+PTM outputing stops when the entire simulation time THi (set in ptm_parameters) has been reached or when its time-advancing
+loop is stopped by "stepper_push" (for reasons below).
+
+ Guiding-center (GC) drift vs Full-orbit (FO) integration.
+ Particle time-advancing is done in subroutine "stepper_push" in module STEPPER, which integrates the particle equation
+of motion either in the GC representation (label "myParticle%drift") or in the FO mode.
+ Subroutine "particle_initialize" initializes the particle trajectory integration in FO mode, and the integration method
+is switched dynamically between GC and FO according to a validity check of the drift representation (local magnetic 
+uniformity/adiabatic drift criterion) IF iswitch=0 in file "ptm_pars". Jesse's intention may have been to stay in FO mode
+for iswitch=-1 and in GC mode if iswitch=1. However, for kappa_drift<kappa_orbit/0.9 in "stepper_push", as currently,
+calculation is switched to GC mode after first timestep. 
+ The switch from GC drift to FO modes is done with a choice of gyrophase switching method based on the iphase parameter in 
+file "ptm_parameters": iphase=1 -> random gyrophase, iphase=2 -> simple minimization of dB, iphase=3 -> Pfefferle's method 
+to minimize delta B.
+
+ Adaptive timestep.
+ Object myParticle is initialized in subroutine "particle_initialize" of module PARTICLES.
+ Subroutine "stepper_push" advances a particle with smaller timesteps adding up to the output-file cadence dtOut,
+by updating quantities (position, velocity) of object myParticle in either GC or FO representations.
+ The integration timestep of "stepper_push" is set initially in subroutine "particle_initialize" to be a small fraction
+(GLOBAL parameters epsilon_drift=0.1, epsilon_orbit=0.05) of the orbital period/2pi = 1/wc.
+ Subroutine "stepper_push" recalculates timestep duration after each time-step
+   1. dt=epsilon_orbit*T_gyr/2pi  --- IF in FO mode
+   2. dt=epsilon_drift*tau_v with tau_v=(gamma*v)/acc being the timescale at which all accelerations involved 
+       (electric, gradient, curvature, miror) would account for the current particle speed (the "Kress-Hudson heuristic") 
+       ---- IF in GC mode.
+
+ Integrator of ODE for particle motion.
+ In subroutine "stepper_push", time-integration can be done with either
+ 1. a fixed timestep Runge-Kutta integrator = subroutine "RK4" in module STEPPER, if istep=1 in file "ptm_parameters" or
+ 2. an adaptive timestep integrator = subroutine "range_integrator" in module RKSUITE, if istep=2 in file "ptm_parameters"
+without a dynamical switching between these integrators.
+ Note: RKSuite integrator takes 4x more CPU than RK4. Need to understand if that extra effort pays off.
+
+ Particle periodic motions.
+ Therefore, for FO mode, the gyro-orbit is time-sampled every delta-phase-change = 3 deg, with RK4 splitting that in half.
+ "ptm_000N,dat" file has cadence dtOut=1 sec (set in file "ptm_pars_000N.txt").
+ 1. Gyration period is Tg = 0.14ms*(250nT/B) for electrons, a factor mp/me=1837 larger for protons -> 0.26s
+     independent of particle energy E for non-rel/semi-relativistic particle
+    Conclusion: particle orbit is (much) under-sampled in output file "ptm_000N.dat"
+ 2. Bounce period is Tb = (0.6-0.9)s*sqrt(100keV/E)*(R/5RE) for non-rel electrons, a factor sqrt(mp/me)=43 larger for protons
+     weakly dependent on initial pitch-angle 
+     (mirror point goes to a larger zmax with decreasing PA but vpara increases,
+     so that length_arc(Beq-Bm)~zmax/avg_vpara~cos(PA) is "stiff").
+    Conclusion: bounce motion is under-sampled in output file "ptm_000N.dat"
+ 3. Particle drift is dominated by radial dependence of B (ExB drift has a velocity 10x smaller).
+    Drift period Td = 2.0h*(B/250nT)*(R/RE)^2*(100keV/E) (any particle) has a very weak dependence on PA
+     (note v_drift ~ v_perp^2/B = const along field line, due to 1st invariant -> spatial drift constant during bounce
+      factor 1: smaller PA implies smaller vperp in equatorial plane and smaller spatial drift velocity 
+      factor 2: smaller PA implies access to higher latitudes, where the angular drift velocity is larger for that constant drift velocity,
+      1 & 2 compensate each other).
+    Conclusion: drift motion is well-sampled in output file "ptm_000N.dat"
+    Note: I do not understand why coordinate y (proxy for e_phi) does not evolve monotonically owing to particle drift
+          when drift motion is dominant over gyration, i.e. when v_drift (~R_gyr*vperp/R) * output_timestep > R_gyr.
+          That feature does not disappear if RKSuite instead of RK4, or if timestep is decreased (smaller epsilon_drift/orbit)
+
+ STEPPER time-advancing.
+ Time-stepping loop is stopped if the drift or orbit integrator encounters a problem, if the particle hits the ionosphere
+(r=1 R_E), or if the particle has reached the source region boundary (when in flux-map mode).
+ Because time-advancing is prescribed to be done a fixed number (nstep_max) of times, based on the initial timestep duration,
+the adaptive timestep method may lead to a time-advancing less than the desired dtOut (requested by PTM), with warning
+"Particle required too many steps for integration".
+
+
+ III. OUTPUT
+
+The SHIELDS-PTM simulation outputs in two different types of output files:
+ptm_000x.dat if x=1,2 (monoenergetic particles/Maxwellian distribution)
+map_000x.dat if x=3,4 (uniform E&PA distributions/user-specified flux-map mode)
+                 (from dist_velocity file)
+
+ The ptm output file contains trajectories for each particle in the simulation.
+For each time step that is output into this file, there are seven quantities that are recorded:
+
+TIME    X-Pos   Y-Pos   Z-Pos   gamma*Vperp   gamma*Vpara   Energy   PitchAngle
+
+ note: velocities are v_ptm = gamma*v_real, with gamma=(Ek/mc2+1)=1/sqrt(1-vreal^2)=sqrt(1+vptm^2) !!!
+
+ When SHIELDS-PTM is run in parallel, particles are not output in any particular order. Instead, a particle's full time
+history is output as soon as it is available (i.e. as soon as the particle has finished integration).
+See file_format.txt for a complete description of how these files are arranged.
+
+ Because of the inherent disorder of the ptm_xxxx.dat file, it is not convenient to use this file for Liouville tracing
+estimates of the distribution, which is one of the primary reasons that SHIELDS-PTM was developed in the first place.
+However, the map_xxxx.dat file is designed for just this purpose. The "map" output file lists
+
+ TIME    X-Pos   Y-Pos   Z-Pos   GridEnergy  GridPitchAngle   Energy
+
+ Units:
+ Location/distance in R_E
+ velocity in km/s
+ energy in keV
+ B mag in nT
+ E in nT*km/s= muV/m
+
