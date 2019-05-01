@@ -25,9 +25,7 @@ class ptm_input_creator(object):
     An object for creating input data files for the SHIELDS-PTM code framework
     """
 
-    __ckm = 2.998e5         # Speed of light in km/s
-    __dtor = np.pi/180.0    # Convert degrees to radians
-    __rtod = 180.0/np.pi    # Convert radians to degrees
+    __ckm = 2.99792458e5         # Speed of light in km/s
 
     # These are internal parameter sets which differ based on certain arguments.
 
@@ -117,7 +115,7 @@ class ptm_input_creator(object):
             self.__ddict['z0']=0.0       # Initial Z-position (RE)
         elif(idensity==2):
             # Cubic region
-            self.__ddict['idensity']=2
+            self.__ddict['idens']=2
             self.__ddict['xmin']=-7.0    # Minimum X-boundary of seeding region (RE)
             self.__ddict['xmax']=-6.0    # Maximum X-boundary of seeding region (RE)
             self.__ddict['ymin']=-0.5    # Minimum Y-boundary of seeding region (RE)
@@ -280,9 +278,10 @@ class ptm_input_creator(object):
                 filedir+='/'
 
         # Output filenames
-        pfname='{}ptm_parameters_{:04d}.txt'.format(filedir,self.__pdict['runid'])
-        dfname='{}dist_density_{:04d}.txt'.format(filedir,self.__pdict['runid'])
-        vfname='{}dist_velocity_{:04d}.txt'.format(filedir,self.__pdict['runid'])
+        #TODO:check whether ptm_input subdirectory needs to be specified here
+        pfname='{}ptm_input/ptm_parameters_{:04d}.txt'.format(filedir,self.__pdict['runid'])
+        dfname='{}ptm_input/dist_density_{:04d}.txt'.format(filedir,self.__pdict['runid'])
+        vfname='{}ptm_input/dist_velocity_{:04d}.txt'.format(filedir,self.__pdict['runid'])
 
         # The [x]dfkeys lists give the name of all keys from the appropriate structure that
         # will be written to the corresponding output files and they provide the order
@@ -386,8 +385,8 @@ class ptm_input_creator(object):
         # provided in whatever format is sent to this routine.
 
         if(isSpherical):
-            ph=self.__dtor*np.array([self.mlt_to_phi(mlt) for mlt in positions[:,1]])
-            th=self.__dtor*(90.0-positions[:,2])
+            ph=np.deg2rad(np.array([self.mlt_to_phi(mlt) for mlt in positions[:,1]]))
+            th=np.deg2rad((90.0-positions[:,2]))
             r=positions[:,0]*np.sin(th)**2
             x=r*np.sin(th)*np.cos(ph)
             y=r*np.sin(th)*np.sin(ph)

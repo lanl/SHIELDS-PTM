@@ -24,6 +24,8 @@ from scipy.interpolate import Rbf
 
 __mhdFields=['bx','by','bz','ux','uy','uz']
 
+
+
 def gauss_interp(xwant,ywant,zwant,fdict,key,smoothingDegree=0.5,numNeighbors=24):
   """
   Three-dimensional Gaussian weighting interpolator. This is a form of inverse distance weighting (IDW)
@@ -67,6 +69,8 @@ def gauss_interp(xwant,ywant,zwant,fdict,key,smoothingDegree=0.5,numNeighbors=24
 
   return res
 
+
+
 def gauss_interp_EB(xwant,ywant,zwant,fdict,smoothingDegree=0.5,numNeighbors=24):
   """
   Three-dimensional Gaussian weighting interpolator. This is a form of inverse distance weighting (IDW)
@@ -88,20 +92,20 @@ def gauss_interp_EB(xwant,ywant,zwant,fdict,smoothingDegree=0.5,numNeighbors=24)
 
   # Check that the data file is three-dimensional
   try:
-    myTree = cKDTree(zip(fdict['x'].squeeze(),fdict['y'].squeeze(),fdict['z'].squeeze()))
+    myTree = cKDTree(list(zip(fdict['x'].squeeze(), fdict['y'].squeeze(), fdict['z'].squeeze())))
   except KeyError:
     missingKeys=''
     if(not fdict.has_key('x')): missingKeys+='x '
     if(not fdict.has_key('y')): missingKeys+='y '
     if(not fdict.has_key('z')):
       missingKeys+='z'
-      if(missingKeys=='z'): print "\nBased on missing keys, SWMF file may contain only 2D data\n"
+      if(missingKeys=='z'): print("\nBased on missing keys, SWMF file may contain only 2D data\n")
     raise Exception('Error in gaussian_interp_EB: fdict does not have expected keys: {'+missingKeys.strip()+'}')
 
   # Check that data file contains the correct components
 
   for key in __mhdFields:
-    if(not fdict.has_key(key)): raise Exception('Error in gauss_interp_EB: requested key {'+key+'} was not present in fdict')
+    if(key not in fdict): raise Exception('Error in gauss_interp_EB: requested key {'+key+'} was not present in fdict')
 
   Y,X,Z=np.meshgrid(ywant,xwant,zwant)
   dists,dexes=myTree.query(np.c_[X.ravel(),Y.ravel(),Z.ravel()],numNeighbors)
@@ -161,7 +165,7 @@ def rbf_interp_EB(xwant,ywant,zwant,fdict,numNeighbors=48,smoothingDegree=0.05,b
     if(not fdict.has_key('y')): missingKeys+='y '
     if(not fdict.has_key('z')):
       missingKeys+='z'
-      if(missingKeys=='z'): print "\nBased on missing keys, SWMF file may contain only 2D data\n"
+      if(missingKeys=='z'): print("\nBased on missing keys, SWMF file may contain only 2D data\n")
     raise Exception('Error in rbf_interp_EB: fdict does not have expected keys: {'+missingKeys.strip()+'}')
 
   # Check that requested basis is supported
