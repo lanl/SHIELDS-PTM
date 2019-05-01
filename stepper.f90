@@ -12,10 +12,10 @@
 !
 !+REVISION HISTORY
 !   12 March 2015:    Original code
-!    6 April 2015:    Modified code to use RKSUITE90 integrators via local function passing. As far as I know,
-!                     only IFORT has this F2008 feature implemented, need to check PGF90
-!    5 May 2016:      Modified timestep selection to ensure proper matching of actual times to requested times. Code
-!                     has been validated to run on GNU Fortran 4.8.2 with the -std=f2008ts flag
+!    6 April 2015:    Modified code to use RKSUITE90 integrators via local function passing.
+!                     As far as I know, only IFORT has this F2008 feature implemented, need to check PGF90
+!    5 May 2016:      Modified timestep selection to ensure proper matching of actual times to requested times. 
+!                     Code has been validated to run on GNU Fortran 4.8.2 with the -std=f2008ts flag
 
 module stepper
 
@@ -27,41 +27,44 @@ use fields
 contains
 
   subroutine stepper_push(myParticle,tnext)
-  ! This is the main particle pushing routine. Calculates the local magnetic uniformity criterion
-  ! and determines if it is safe to use the drift equations. Estimates new timestep using the Kress [2008]
-  ! heuristic or by requiring proper resolution of particle gyromotion. Global parameters drift_epsilon and
-  ! orbit_epsilon are used to scale the timesteps to ensure accuracy.
+  ! This is the main particle pushing routine 
+
   implicit none
 
   type(particle) :: myParticle
   real(dp), intent(in) :: tnext
   real(dp), parameter :: kappa_orbit = 1.0d-2 ! These two values are set so that a particle doesn't just
   real(dp), parameter :: kappa_drift = 0.8d-2 ! oscillate between drift and orbit in regions of marginal smoothness
-  real(dp), parameter :: dt_base = 1.0d-3
-  real(dp) :: b0, wc, kappa, t, igam, t_int, rho
+  real(dp), parameter :: dt_base = 1.0d-3     ! to set a maximal number of timesteps
+  real(dp) :: b0, wc, kappa, t, igam, t_int, rho, delt
   real(dp), dimension(3) :: bhat, bvec, rvec, rhat
   real(dp), dimension(3) :: fE, fG, fC, fM
   real(dp), dimension(3,3) :: Bgrad
   real(dp), dimension(3) :: gradb, gradbhat, evec, curlb, curlbhat
   real(dp), dimension(:), allocatable :: y
   real(dp), dimension(:), allocatable :: yp
+  real(dp), dimension(:), allocatable :: k1, k2, k3, k4
   integer :: i, iflag, nstep, nstep_max
 
-  ! Initialize storage for the integrators and communicators if using RKSuite
+  ! Initialize storage for the integrators and communicators if using RKSuite (istep=2)
   if(myParticle%drift) then
-    allocate(y(4),yp(4))
+    allocate(y(4),yp(4),k1(4),k2(4),k3(4),k4(4))
     y = myParticle%y(1:4)
     if(istep==2) call setup(myParticle%comm,myParticle%t,y,tnext,tol,(/(thresh,i=1,4)/),method='H',task='R',message=.FALSE.)
   else
-    allocate(y(6),yp(6))
+    allocate(y(6),yp(6),k1(6),k2(6),k3(6),k4(6))
     y = myParticle%y(1:6)
     if(istep==2) call setup(myParticle%comm,myParticle%t,y,tnext,tol,(/(thresh,i=1,6)/),method='M',task='R',message=.FALSE.)
   endif
 
-  nstep = 0
+  nstep = 0                                          ! why ? nstep is a counter in next do loop 
   nstep_max = floor(abs(tnext-myParticle%t)/dt_base)
 
-  do nstep=1,nstep_max
+
+  DO nstep=1,nstep_max                 ! nstep is a dummy counter
+
+
+  ! PART 1; advance one timestep 
 
     t = myParticle%t
 
@@ -73,18 +76,24 @@ contains
     endif
 
     ! Determine the set of equations to solve based on the current drift state of the particle
-    if(myParticle%drift) then
-      ! Solve guiding center drift equations
+
+    If (myParticle%drift) then         ! Solve guiding center drift equations
 
       select case(istep)
         case(1)
           ! Use fixed timestep RK4 integrator
-          call rk4(drift_derivs,y,t,t_int-t)
+           call rk4(drift_derivs,y,t,t_int-t)  ! updates y as below
+          ! delt=t_int-t
+          ! k1 = delt*drift_derivs(t,y)
+          ! k2 = delt*drift_derivs(t+0.5d0*delt,y+0.5d0*k1)
+          ! k3 = delt*drift_derivs(t+0.5d0*delt,y+0.5d0*k2)
+          ! k4 = delt*drift_derivs(t+delt,y+k3)
+          ! y = y+(k1+2*k2+2*k3+k4)/6
           myParticle%y(1:4) = y
 
         case(2)
-          ! Use adaptive RKSuite integrator
-          call range_integrate(myParticle%comm,drift_derivs,t_int,t,y,yp,flag=iflag)
+          ! Use adaptive RKSuite integrator (ADP)
+           call range_integrate(myParticle%comm,drift_derivs,t_int,t,y,yp,flag=iflag)
           myParticle%t = t
           myParticle%y(1:4) = y
           if(iflag==5) then
@@ -96,16 +105,22 @@ contains
           call assert(.FALSE.,"stepper_push","option "//int2str(istep)//" not currently supported.")
       end select
 
-    else ! Particle is in full orbit
+    Else                             ! Particle is in full orbit
 
       select case(istep)
         case(1)
           ! Use fixed timestep RK4 integrator
-          call rk4(orbit_derivs,y,t,t_int-t)
+           call rk4(orbit_derivs,y,t,t_int-t)
+          ! delt=t_int-t
+          ! k1 = delt*orbit_derivs(t,y)
+          ! k2 = delt*orbit_derivs(t+0.5d0*delt,y+0.5d0*k1)
+          ! k3 = delt*orbit_derivs(t+0.5d0*delt,y+0.5d0*k2)
+          ! k4 = delt*orbit_derivs(t+delt,y+k3)
+          ! y = y+(k1+2*k2+2*k3+k4)/6
           myParticle%y(1:6) = y
         case(2)
-          ! Use adaptive RKSuite integrator
-          call range_integrate(myParticle%comm,orbit_derivs,t_int,t,y,yp,flag=iflag)
+          ! Use adaptive RKSuite integrator (ADP)
+           call range_integrate(myParticle%comm,orbit_derivs,t_int,t,y,yp,flag=iflag)
           myParticle%t = t
           myParticle%y(1:6) = y
           if(iflag==5) then
@@ -116,14 +131,17 @@ contains
           call assert(.FALSE.,"stepper_push","option "//int2str(istep)//" not currently supported.")
       end select
 
-    endif
+    End If
 
     if(.not. myParticle%integrate) exit
 
-    ! Check validity of drift representation
+
+    ! PART 2: check validity of drift representation
+    ! Calculates the local magnetic uniformity criterion ! and determines if it is safe to use the drift equations 
+
     call get_fields(myParticle,bvec,gradb=Bgrad)
 
-    ! Evaluate the adiabatic drift criterion
+    ! Evaluate the adiabatic drift criterion (??)
     b0 = norm(bvec)
     wc = abs(myParticle%p(1)*b0)
     bhat = bvec/b0
@@ -145,16 +163,17 @@ contains
           kappa = rho*norm(gradb)/b0
     end select
 
-    if(kappa > kappa_orbit) then
+
+    If (kappa > kappa_orbit) then
       ! Use full particle orbits
 
       if(myParticle%drift) then
         ! Switch to full orbit representation if currently in guiding center
+
         call drift_to_full(myParticle)
 
         deallocate(y,yp)
         allocate(y(6),yp(6))
-
         y = myParticle%y(1:6)
 
         if(istep==2) then
@@ -164,7 +183,8 @@ contains
         endif
 
       endif
-    else
+
+    Else
       ! Use guiding center equations
 
       if(.not. myParticle%drift .and. kappa < kappa_drift) then
@@ -174,7 +194,6 @@ contains
 
         deallocate(y,yp)
         allocate(y(4),yp(4))
-
         y = myParticle%y(1:4)
 
         if(istep==2) then
@@ -184,9 +203,15 @@ contains
         endif
 
       endif
-    endif
 
-    ! Determine new timestep
+    End If
+
+
+    ! PART 3 : Determine new timestep
+    ! Estimate new timestep using the Kress [2008] heuristic (if in drift representation) or 
+    ! by requiring proper resolution of particle gyromotion (if in orbit mode). 
+    ! GLOBAL parameters epsilon_drift and epsilon_orbit are used to scale the timesteps to ensure accuracy.
+
     call get_fields(myParticle,bvec,evec=evec,gradb=Bgrad)
 
     if(myParticle%drift) then
@@ -216,6 +241,9 @@ contains
       endif
     endif
 
+
+    ! PART 4: checks
+
     ! Check for particle precipitation to ionosphere
     if(norm(myParticle%x) <= 1.0d0) then
       write(*,*) "Particle has precipitated", myParticle%t
@@ -237,21 +265,28 @@ contains
       exit
     endif
 
-  enddo
+  END DO  ! (loop over timesteps) 
 
+  ! if all steps were completed, then nstep=nstep_max. if EXIT executed above, then nstep<nstep_max
+  ! thus next warning appears only when loop was fully done but the adaptive timestep has advanced 
+  ! particle less than the dtOut requested by PTM
   if(nstep >= nstep_max) then
     write(*,*) "Particle required too many steps for integration"
-    myParticle%integrate = .FALSE.
+  ! in addition to above .FALSE., advancing less than dtOut will stop the PTM loop :
+    myParticle%integrate = .FALSE.                
   endif
 
   ! Clean up integration
   if(istep==2) call collect_garbage(myParticle%comm)
   deallocate(y,yp)
 
+
   contains
     ! Making these functions local to the procedure allows us to pass them to the integrator
     ! while maintaining access to the particle information which is necessary to use the
-    ! external ODE library RKSuite90
+    ! external ODE library RKSuite90. But gfortran does not allow these functions
+    ! to be used as arguments in subroutines rk4 and range_integrate above
+
 
     function orbit_derivs(t,y) result(ydot)
     ! Calculates the derivatives for advancing particle trajectory
@@ -271,8 +306,15 @@ contains
       myParticle%t = t
       myParticle%y(1:6) = y
 
+      !write (*,*) 'x,y,z=',y(1),y(2),y(3)
+      !write (*,*) 'vx,vy,vz=',y(4),y(5),y(6)
+
       call get_fields(myParticle,bvec,evec=evec)
       gami = 1.d0/sqrt(1.d0+dot_product(myParticle%v,myParticle%v)/csq)
+
+      !write (*,*) 'B=',bvec
+      !write (*,*) 'E=',evec
+      !write (*,*) 'gamma=',1./gami
 
       ydot(1:3) =  gami*myParticle%v/re
       ydot(4:6) =  myParticle%p(1)*(evec+gami*cross_product(myParticle%v,bvec))

@@ -88,6 +88,8 @@ contains
   b0 = norm(bvec)
   bhat = bvec/b0
 
+! Store lab frame quantities = orbit params
+
   if(myParticle%drift) then
     vpara = myParticle%v(1)
     vperp = sqrt(2.0d0*b0*myParticle%v(2))
@@ -100,7 +102,7 @@ contains
     xpos = myParticle%x
   endif
 
-  gam=sqrt(1.d0+(vpara/ckm)**2+(vperp/ckm)**2)
+  gam=sqrt(1.d0+(vpara/ckm)**2+(vperp/ckm)**2)  ! gam = sqrt(1+beta**2) is good only for semi-relativistic
 
   dataStore(1) = myParticle%t
   dataStore(2:4) = xpos

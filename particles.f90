@@ -1,3 +1,21 @@
+!+MODULE NAME
+!   particles
+!
+!+MODULE DESCRIPTION
+!   This module initialize the particle spatial and velocity distributions,
+!   and contains a function for transforming particle location between Cartesian
+!   and field-aligned coordinate systems.
+!
+!+CONTAINS subroutines
+!   PARTICLES_INITIALIZE  
+!   PARTICLE_INITIALIZE  
+!   FAC_ROTATION_MATRIX
+!
+!+AUTHOR
+!   Jesse Woodroffe
+!   jwoodroffe@lanl.gov
+!
+
 module particles
 
 use global
@@ -27,9 +45,11 @@ contains
   real(dp) :: gam, vt
   integer :: i
 
-  ! Initialize the system RNG
+
+  ! Initialize the system Random Number Generator
   call random_seed(size=nseed)
   call random_seed(put=(/(irand+i,i=0,nseed-1)/))
+
 
   ! Configure velocity space distribution
 
@@ -39,12 +59,15 @@ contains
 
   read(lun,*) idist
 
+
   select case(idist)
 
     case(1)
       ! Monoenergetic ring distribution
       read(lun,*) E0
+      write (*,*) 'Particle Energy =',E0
       read(lun,*) alpha
+      write (*,*) 'Pitch Angle =',alpha
       read(lun,*) phi0
       gam = 1.0+E0/(mass*mc2)
       vt = ckm*sqrt(gam*gam-1)/gam
@@ -121,6 +144,7 @@ contains
   end select
 
   close(lun)
+
 
   ! Configure physical space distributions
 
@@ -205,7 +229,7 @@ contains
   R(2,:) = qhat
   R(3,:) = bhat
 
-  ! If rotaion from FAC to Cartesian is desired, transpose rotation matrix
+  ! If rotation from FAC to Cartesian is desired, transpose rotation matrix
   if(present(toCartesian)) then
     if(toCartesian) R = transpose(R)
   endif
@@ -231,23 +255,27 @@ contains
 
   myParticle%drift = .FALSE.
   myParticle%integrate = .TRUE.
+
   myParticle%p(1) = e_me*charge_mass_ratio
   myParticle%p(2) = mass*mc2
 
+
+! initialize particle location (x,y,z)
+
   select case(idens)
+
     case(1) ! All particles start at same position
       x = x0
       y = y0
       if(ndim==2) then ! Put the particle in the center of a unit cell in z
         z = 0.5d0
-      else ! Full 3d grids are being used
+      else            ! Full 3d grids are being used
         z = z0
       endif
-    case(2) ! Particles are seeded randomly throughout a rectangular region
 
+    case(2) ! Particles are seeded randomly throughout a rectangular region
       x = xsMin+(xsMax-xsMin)*random_uniform()
       y = ysMin+(ysMax-ysMin)*random_uniform()
-
       if(ndim==2) then
         z = 0.5d0
       else
@@ -262,6 +290,9 @@ contains
     case default
       call assert(.FALSE.,'particle_initialize','idens='//int2str(idens)//' not supported')
   end select
+
+
+! initialize particle velocity vector (vp,vz)
 
   select case(idist)
     case(1) ! Initialize a particle beam
@@ -292,9 +323,12 @@ contains
 
   ! Seed gyrophase as appropriate
   phi = merge(dtor*phi0,twopi*random_uniform(),phi0>0.0d0)
-  gam = sqrt(1.d0+(vp**2+vz**2)/csq)
+  gam = sqrt(1.d0+(vp**2+vz**2)/csq)                       ! not used and good only for mildly relativistic
 
   if(ndim==2) vz = 0.d0 ! Just in case of roundoff error
+
+
+  ! *********** construct myParticle object
 
   ! Target component pointers
   allocate(myParticle%y(7))
@@ -320,21 +354,23 @@ contains
   dz = zgrid(km+1)-zgrid(km)
   dt = tgrid(lm+1)-tgrid(lm)
 
+
   call grid_init(myParticle%grid,im,jm,km,lm,dx,dy,dz,dt)
 
   ! Call the fields routine to initialize the tricubic coefficients and determine the initial timestep
-  call get_fields(myParticle,bvec,doInit=.TRUE.)
 
-  bhat = bvec/norm(bvec)
+  call get_fields(myParticle,bvec,doInit=.TRUE.)   ! calculates the mag field at point myParticle%x thru tricubic (spatial) interpolation
 
-  R = fac_rotation_matrix(myParticle,toCartesian=.TRUE.)
-  rhat = matmul(R,[cos(phi),sin(phi),0.0d0])
+  bhat = bvec/norm(bvec)                           ! mag field direction
+
+  R = fac_rotation_matrix(myParticle,toCartesian=.TRUE.)  ! rotation from PQB field-aligned to Cartesian coordinates
+  rhat = matmul(R,[cos(phi),sin(phi),0.0d0])              ! rotation by gyro-phase ?
 
   ! Initialize particle velocity in Cartesian coordinates
   myParticle%v = vz*bhat+vp*rhat
 
   if(istep==2) then ! Longer steps with the adaptive RK method
-    myParticle%dt = sign(epsilon_drift/abs(myParticle%p(1)*norm(bvec)),real(itrace,dp))
+    myParticle%dt = sign(epsilon_drift/abs(myParticle%p(1)*norm(bvec)),real(itrace,dp))   ! dt=sign(itrace)*epsilon/(eB/m)
   else
     myParticle%dt = sign(epsilon_orbit/abs(myParticle%p(1)*norm(bvec)),real(itrace,dp))
   endif

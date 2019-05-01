@@ -53,7 +53,7 @@ integer :: nt
 integer :: nparticles
 integer :: itraj
 
-character(len=4) :: id_string
+character(len=4) :: id_string     ! why here ? move to PTM.f90 subroutine get_run_id
 
 real(dp) :: dtIn
 real(dp) :: dtOut

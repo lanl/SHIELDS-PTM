@@ -6,6 +6,10 @@
 !   to determine the electric and magnetic fields at arbitrary points in space via interpolation:
 !   linear in time and trilinear/tricubic in space
 !
+!+CONTAINS subroutines
+!   FIELD_INITIALIZE
+!   GET_FIELDS  
+!
 !+AUTHOR
 !   Jesse Woodroffe
 !   jwoodroffe@lanl.gov
@@ -26,7 +30,7 @@ contains
   character(len=22) :: dfile
 
   ! Allocate storage for global arrays
-  allocate(xgrid(nx),ygrid(ny))
+  allocate(xgrid(nx),ygrid(ny))          ! nx,ny,nz are set in file ptm_pars 
 
   if(ndim==2) then
     allocate(zgrid(2))
@@ -38,7 +42,7 @@ contains
     allocate(EX3D(nt,nx,ny,nz),EY3D(nt,nx,ny,nz),EZ3D(nt,nx,ny,nz))
   endif
 
-  ! Read data files files
+  ! Read spatial grid. Interface READ_ARRAY/subroutines read_array_1d,2d,3d are in module GLOBAL 
   call read_array('ptm_data/xgrid.bin',xgrid)
   call read_array('ptm_data/ygrid.bin',ygrid)
 
@@ -48,31 +52,20 @@ contains
     zgrid = (/0.d0,1.d0/)
   endif
 
-  ! Spatial and temporal ranges
-  if(dtIn > 0.0d0) then
-    ! We are specifying what files to use, determine the times corresponding to those files
-
-    allocate(tgrid(nt))
+  ! Read/construct time grid
+  if (dtIn > 0.0d0) then
+    allocate(tgrid(nt))   ! We are specifying what files to use, determine the times corresponding to those files
     TMin = 0.0d0
-    TMax = dtIn*real(nt-1,dp)
-    tgrid = linspace(TMin,Tmax,nt)
-
+    TMax = dtIn*real(nt-1,dp)        ! dtIN is cadence (s) read by module FILEIO from file ptm_pars
+    tgrid = linspace(TMin,Tmax,nt)   ! nt is number of tstepts set in FILEIO
   else
-
-    ! We are reading in the grid directly, figure out what files are needed
-
-    allocate(tgrid(ntot))
-
+    allocate(tgrid(ntot))     ! We are reading in the grid directly, figure out what files are needed
     call read_array('ptm_data/tgrid.bin',tgrid)
-
-    ifirst = maxval(maxloc(tgrid,tgrid<=tlo))
+    ifirst = maxval(maxloc(tgrid,tgrid<=tlo))       ! maxval has no effect on a 0D array 
     ilast = maxval(minloc(tgrid,tgrid>=thi))
-
     nt = ilast-ifirst+1
-
     TMin = tgrid(ifirst)
     TMax = tgrid(ilast)
-
   endif
 
   XMin = minval(xgrid)
@@ -86,12 +79,14 @@ contains
   write(*,*) xmin, " <= X <= ", xmax
   write(*,*) ymin, " <= Y <= ", ymax
   write(*,*) zmin, " <= Z <= ", zmax
+  !write(*,*) tmin, " <= T <= ", tmax
 
-  ! Get electromagnetic fields
+
+  ! Get electromagnetic fields, number ndim of space dimensions is set in file ptm_pars
 
   if(ndim==2) then
 
-    write(*,*) "Reading 2D electromagnetic field data"
+    write(*,*) "Reading 2D electromagnetic field data" 
 
     do j=ifirst,ilast
       i=j-ifirst+1
@@ -131,7 +126,6 @@ contains
       i = j-ifirst+1
 
       write(dfile,'("ptm_data/bx3d_",i4.4,".bin")') j
-
       call read_array(dfile,BX3D(i,:,:,:))
 
       write(dfile,'("ptm_data/by3d_",i4.4,".bin")') j
@@ -193,10 +187,10 @@ contains
     if(myParticle%x(3) < zmin .or. myParticle%x(3) > zmax) write(*,'(a20,3es16.5)') "Z OUT OF BOUNDS", zmin, myParticle%x(3), zmax
 
     write(*,*) "PARTICLE POSITION WHEN LEAVING DOMAIN"
-    write(*,*) tmin, myparticle%t,    tmax
-    write(*,*) xmin, myparticle%x(1), xmax
-    write(*,*) ymin, myparticle%x(2), ymax
-    write(*,*) zmin, myparticle%x(3), zmax
+    write(*,*) 'T:',tmin, myparticle%t,    tmax
+    write(*,*) 'X:',xmin, myparticle%x(1), xmax
+    write(*,*) 'Y:',ymin, myparticle%x(2), ymax
+    write(*,*) 'Z:',zmin, myparticle%x(3), zmax
 
     ! Mark particle as finished
     myParticle%integrate=.FALSE.

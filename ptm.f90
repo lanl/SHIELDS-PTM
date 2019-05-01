@@ -26,51 +26,57 @@ type(particle) :: myParticle
 real(dp), dimension(:,:), allocatable :: particleData
 
 call get_run_id()
+
 call read_ptm_parameters()
 
-call fields_initialize()
+call fields_initialize()            ! reads (t,x,y,z)-grid and initial/final B and E fields from ptm_data files
 
-call particles_initialize()
+call particles_initialize()         ! reads bounds from ptm_input files, needed for particle init below (do loop)
+
 call initialize_timing()
 
-! Zero index for initial conditions
-allocate(particleData(0:nwrite,8))
+allocate(particleData(0:nwrite,8))  ! zero index for initial conditions, eight output qunatities of myParticle: t,x,y,z,vperp,vpara,E,PA
+
 
 !$omp parallel do default(shared) private(n,myParticle,particleData,iwrite)
-do n=1,nparticles
 
-  call particle_initialize(myParticle,n)
+DO n=1,nparticles
 
-  ! Store the initial conditions
-  call storeData(myParticle,particleData(0,:))
+  call particle_initialize(myParticle,n)  ! initializes velocity (vapara,vperp) and spatial distribution in object myParticle
+
+  call storeData(myParticle,particleData(0,:)) ! store initial conditions
 
   iwrite = 1
+
   do
-    call stepper_push(myParticle,myParticle%t+sign(dtOut,real(itrace,dp)))
-    call storeData(myParticle,particleData(iwrite,:))
-    if(.not. myParticle%integrate .or. iwrite==nwrite) exit
+    call stepper_push(myParticle,myParticle%t+sign(dtOut,real(itrace,dp)))   !  advance myParticle one dtOut (in file ptm_pars)
+    call storeData(myParticle,particleData(iwrite,:))                        !  store data every output file cadence
+    ! exit when finished or when problems were encountered with particle time-stepping in stepper_push
+    if(.not. myParticle%integrate .or. iwrite==nwrite) exit               
     iwrite = iwrite+1
   enddo
 !$omp critical
 
-  !******************
-  ! Write data files
-  !******************
-
+  ! write data files
   if(fluxMap) call writeFluxCoordinates(myParticle)
   if((.not. fluxMap) .or. itraj==1) call writeDataStore(particleData(:iwrite,:))
 
 !$omp end critical
+
   call particle_cleanup(myParticle)
-enddo
+
+END DO
+
 !$omp end parallel do
 
-deallocate(particleData)
 
+deallocate(particleData)
 call fields_cleanup()
 call finalize_timing()
 
 write(*,*) "PTM simulation has finished"
+
+
 
 contains
 
@@ -79,7 +85,9 @@ contains
   implicit none
 
   integer :: argnum, arglen, argstat
-  character(len=4) :: argstr
+  character(len=4) :: argstr            ! set at run 
+! character(len=4) :: id_string         ! output of this subr, not declared here, but in GLOBAL.f90
+
   argnum = 1
   arglen = 4
   call get_command_argument(argnum,argstr,arglen,argstat)
@@ -98,8 +106,8 @@ contains
 
   nwrite = ceiling((THi-TLo)/abs(dtOut))
 
-  write(*,*) "Fields Time Range = ", TMin, TMax
-  write(*,*) "Particle Time Range = ", TLo, THi
+  write(*,*) "Fields Set at Time Range = ", TMin, TMax
+  write(*,*) "Simulation Time Range = ", TLo, THi
   write(*,*) "dtOut = ", dtOut
   write(*,*) "nwrite = ", nwrite
   write(*,*) "Done with setup, beginning PTM simulation"
