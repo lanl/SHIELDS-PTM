@@ -21,7 +21,7 @@ use omp_lib
 implicit none
 
 integer :: n, iwrite, nwrite
-real(dp) :: tic, toc
+real(dp) :: tic, toc, lastepoch
 type(particle) :: myParticle
 real(dp), dimension(:,:), allocatable :: particleData
 
@@ -49,11 +49,13 @@ DO n=1,nparticles
   iwrite = 1
 
   do
+    if (mod(iwrite,360).eq.0) write (*,*) 'particle ',n,' time =',myParticle%t
     call stepper_push(myParticle,myParticle%t+sign(dtOut,real(itrace,dp)))   !  advance myParticle one dtOut (in file ptm_pars)
     call storeData(myParticle,particleData(iwrite,:))                        !  store data every output file cadence
     ! exit when finished or when problems were encountered with particle time-stepping in stepper_push
     if(.not. myParticle%integrate .or. iwrite==nwrite) exit               
     iwrite = iwrite+1
+    lastepoch=myParticle%t
   enddo
 !$omp critical
 
@@ -69,13 +71,12 @@ END DO
 
 !$omp end parallel do
 
+write(*,*) "PTM simulation has finished at time t =",lastepoch
+write(*,*) "Desired end time =", max(Tlo,itrace*Thi)
 
 deallocate(particleData)
 call fields_cleanup()
 call finalize_timing()
-
-write(*,*) "PTM simulation has finished"
-
 
 
 contains
