@@ -267,14 +267,18 @@ contains
 
   END DO  ! (loop over timesteps) 
 
-  ! if all steps were completed, then nstep=nstep_max. if EXIT executed above, then nstep<nstep_max
-  ! thus next warning appears only when loop was fully done but the adaptive timestep has advanced 
-  ! particle less than the dtOut requested by PTM
-  if(nstep >= nstep_max) then
-    write(*,*) "Particle required too many steps for integration"
-  ! in addition to above .FALSE., advancing less than dtOut will stop the PTM loop :
-    myParticle%integrate = .FALSE.                
-  endif
+  !A For GC mode, which allows larger adaptive timesteps, EXIT above is executed,  fewer timesteps than the 
+  !  prescribed nstep_max (for a fixed timestep = dt_base) are necessary to reach tnext, and following 
+  !  IF statement does not apply.
+  ! For FO mode, the adaptive timestep = epsilon_orbit*Tgyr/(2pi), can be smaller than dt_base and many more 
+  !  timesteps than nstep_max may be required -> following IF statement terminates the run.
+  !  This is more likely to happen for electrons than for protons because Tgyr ~  particle mass
+  !  Thus, for electrons, without following line, trajectory is advanced much less than the planned Thi 
+
+  !A if(nstep >= nstep_max) then
+  !  write(*,*) "Particle required too many steps for integration"
+  !  myParticle%integrate = .FALSE.                
+  !endif
 
   ! Clean up integration
   if(istep==2) call collect_garbage(myParticle%comm)
