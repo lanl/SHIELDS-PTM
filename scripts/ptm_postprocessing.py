@@ -56,6 +56,8 @@ class ptm_postprocessor(object):
 
         self.__set_defaults = True
 
+
+
     def set_source_parameters(self,n_dens=1.0,e_char=0.5,kappa=2.5,mass=1.0):
         """
         -------
@@ -89,6 +91,7 @@ class ptm_postprocessor(object):
         self.__set_defaults = False
 
         return
+
 
     def calculate_flux(self,fluxmap):
         """
@@ -126,9 +129,12 @@ class ptm_postprocessor(object):
         f0=self.__n*(self.__mc2/(self.__csq*Wc*2*np.pi*self.__kappa))**1.5*(special.gamma(self.__kappa+1)/special.gamma(self.__kappa-0.5))
         f=f0*(1+ei/(self.__kappa*Wc))**-(self.__kappa+1)
 
-        j=1e5*self.__csq*v*v/self.__mc2*f
+        #j=1e5*self.__csq*v*v/self.__mc2*f
+        j=f*1e5*self.__csq*v*v/self.__mc2
 
         return j
+
+
 
     def calculate_omnidirectional_flux(self, pav,flux):
         """
@@ -163,7 +169,9 @@ class ptm_postprocessor(object):
 
         return omni
 
-    def process_run(self,runid):
+
+
+    def process_run(self, runid, verbose=False):
         """
         -------
         Purpose
@@ -204,7 +212,9 @@ class ptm_postprocessor(object):
             omni = self.calculate_omnidirectional_flux(fluxmap['angles'],flux)
 
             results['fluxmap']=fluxmap
-            results['energies']=fluxmap['energies']
+            # results['initial_E']=fluxmap['init_E'] 
+            results['final_E']=fluxmap['final_E'] 
+            results['energies']=fluxmap['energies'] 
             results['angles']=fluxmap['angles']
             results['flux']=flux
             results['omni']=omni
@@ -217,7 +227,16 @@ class ptm_postprocessor(object):
 
             raise Exception('Error in process_run: '+fname+ ' not found.')
 
-        return results
+        if verbose:
+            print("Final Particle Energies [PA] : ", '\n', fluxmap['final_E'])
+            print("Energy grid : ", '\n', fluxmap['energies'])
+            print("PitchAngle grid : ", '\n', fluxmap['angles'])
+            print("Diff Flux [E[PA]]: ", '\n', flux)
+            print("Omni Flux [E]: ", '\n', omni)
+
+        return results  
+
+
 
     def seconds_to_hhmmss(self,tsec):
         """
@@ -248,12 +267,14 @@ class ptm_postprocessor(object):
 
         return int(hh), int(mm), int(ss)
 
+
+
     #------Here we define RAM-specific routines----->
 
     def process_ram_boundary(self,griddir=None,write_files=True,outdir=None,date={'year':2000,'month':1,'day':1}):
         """
-        Rungrids are a new configuration option provided in the updated version of
-        ptm_input. In addition to the input files, there is a rungrid.txt file that
+        Rungrids are a new configuration option provided in the updated version of ptm_input. 
+        In addition to the input files, there is a rungrid.txt file that
         describes the characteristics of each input file (time and location).
 
         When the RAM boundary is simulated using PTM via rungrid configuration, we are able to
@@ -301,6 +322,7 @@ class ptm_postprocessor(object):
             self.write_ram_fluxes(fluxdata,date=date,outdir=outdir)
 
         return fluxdata
+
 
     def write_ram_fluxes(self,fluxdata,date={'year':2000,'month':1,'day':1},outdir=None):
         """
