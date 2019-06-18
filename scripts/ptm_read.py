@@ -1,6 +1,6 @@
 import numpy as np
 
-def read_swmf_tec_file(fname,nheader=23):
+def read_swmf_tec_file(fname,nheader=5):
     """
     READ_SWMF_TEC_FILE
 
@@ -14,22 +14,24 @@ def read_swmf_tec_file(fname,nheader=23):
     # Start by parsing the header
     with open(fname,'r') as f:
         # Skip first line
-        f.readline()
+        #f.readline()
 
-        # Second line gives the variable symbols and their units. Here we do a bunch
-        # of string manipulation to put them in an easy-to-read format
-        varstrs=f.readline().strip().split('=')[1].replace('`','').replace('[','').replace(']','').replace('"','').split(',')
+        # Second line gives the variable symbols and their units. 
+        # Here we do a bunch of string manipulation to put them in an easy-to-read format
+        # varstrs=f.readline().strip().split('=')[1].replace('`','').replace('[','').replace(']','').replace('"','').split(',')
+        # varstrs=f.readline()
         unit_data={}
-        for s in varstrs:
-            l,r=s.split()
-            unit_data[l]=r
-        params=f.readline()
+        # for s in varstrs:
+        #     l,r=s.split()
+        #     unit_data[l]=r
+        #     params=f.readline()
 
     # Get the number of points in the data file
-    npoints=int(params.split(',')[1].split()[1])
+    #npoints=int(params.split(',')[1].split()[1])
 
     # Now we can read the data file
-    dat=np.genfromtxt(fname,skip_header=nheader,max_rows=npoints)
+    # dat=np.genfromtxt(fname,skip_header=nheader,max_rows=npoints)
+    dat=np.genfromtxt(fname,skip_header=nheader,max_rows=None)
 
     # Put the data into a dictionary
     swmfdata={ 'x':dat[:, 0], 'y':dat[:, 1], 'z':dat[:, 2],
