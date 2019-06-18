@@ -52,6 +52,21 @@ contains
     zgrid = (/0.d0,1.d0/)
   endif
 
+   !A That XYZ grid created by PTM_tec_interp.py in ptm_data/bin files and with its nodes nx*ny*nz
+   !   is read now using the nodes nx,ny,nz specified by PTM_input.py in  ptm_input/ptm_parameters.txt file
+   ! The two sets (nx,ny,nz) must match: PTM will crash if you read more grid than available or, if you read less, 
+   !   it will get to "XYZ out of bounds" or, worse, it will not stop but will output NaN's after a much longer run.
+
+    if (size(xgrid).ne.nx.or.size(ygrid).ne.ny) then
+     write (*,*) "Mismatch bewteen size of XY grid in input data files and input ptm_parameters. Run stopped."
+     stop
+    end if
+    if (ndim.eq.3.and.size(zgrid).ne.nz) then
+     write (*,*) "Mismatch between size of Z grid in input data files and input ptm_parameters. Run stopped."
+     stop
+    end if
+
+
   ! Read/construct time grid
   if (dtIn > 0.0d0) then
     allocate(tgrid(nt))   ! We are specifying what files to use, determine the times corresponding to those files
@@ -146,6 +161,18 @@ contains
     enddo
 
   endif
+
+    !A Just in case that you are careless enough to run PTM with mismatching XYZ and Bxyz grids
+    ! because you used input data files created by PTM_INPUT.py with different ! nx*ny*nz nodes:
+
+    if (size(xgrid).ne.size(BX3D,2).or.size(ygrid).ne.size(BX3D,3)) then
+     write (*,*) "Mismatch bewteen size of XY and Bxy grids in input data files.  Run stopped."
+     stop
+    end if
+    if (ndim.eq.3.and.size(zgrid).ne.size(BX3D,4)) then
+     write (*,*) "Mismatch bewteen size of Z and Bz grids in input data files.  Run stopped."
+     stop
+    end if
 
   return
 
