@@ -10,15 +10,16 @@ import ptm_read
 import ptm_interpolate
 
 # If you don't sort first, file order will be unpredictable
-files = np.sort(glob.glob('*.gz'))
+#files = np.sort(glob.glob('*.gz'))
+files = np.sort(glob.glob('*.mhd'))
 
-dtout = 300.0
+dtout = 3600.
 times = dtout*np.arange(np.size(files))
 times.tofile('ptm_data/tgrid.bin')
 
-xwant = np.linspace(-15,10,101)
-ywant = np.linspace(-10,10,81)
-zwant = np.linspace(-10,10,81)
+xwant = np.linspace(-15,10,75)
+ywant = np.linspace(-10,10,75)
+zwant = np.linspace(-10,10,75)
 
 xwant.tofile('ptm_data/xgrid.bin')
 ywant.tofile('ptm_data/ygrid.bin')
@@ -27,20 +28,26 @@ zwant.tofile('ptm_data/zgrid.bin')
 for i, fname in enumerate(files):
 
     # The stat variable can be used to handle exceptions
-    stat=os.system('gunzip '+fname)
+    #stat=os.system('gunzip '+fname)
 
     # Parse the newly unzipped file
-    dat=ptm_read.read_swmf_tec_file(fname[:-3])
+    #dat=ptm_read.read_swmf_tec_file(fname[:-3])
+
+    print('start reading',fname)
+    dat=ptm_read.read_swmf_tec_file(fname)
+    print('done reading file',fname)
 
     # Rezip the file
-    stat=os.system('gzip '+fname[:-3])
+    #stat=os.system('gzip '+fname[:-3])
 
     # Interpolate the data
     res=ptm_interpolate.gauss_interp_EB(xwant,ywant,zwant,dat)
+    print ('done interpolating file',fname)
 
-    res['bx'].tofile('ptm_data/bx3d_%4.4i.bin' % i)
-    res['by'].tofile('ptm_data/by3d_%4.4i.bin' % i)
-    res['bz'].tofile('ptm_data/bz3d_%4.4i.bin' % i)
-    res['ex'].tofile('ptm_data/ex3d_%4.4i.bin' % i)
-    res['ey'].tofile('ptm_data/ey3d_%4.4i.bin' % i)
-    res['ez'].tofile('ptm_data/ez3d_%4.4i.bin' % i)
+    i1=i+1
+    res['bx'].tofile('ptm_data/bx3d_%4.4i.bin' % i1)
+    res['by'].tofile('ptm_data/by3d_%4.4i.bin' % i1)
+    res['bz'].tofile('ptm_data/bz3d_%4.4i.bin' % i1)
+    res['ex'].tofile('ptm_data/ex3d_%4.4i.bin' % i1)
+    res['ey'].tofile('ptm_data/ey3d_%4.4i.bin' % i1)
+    res['ez'].tofile('ptm_data/ez3d_%4.4i.bin' % i1)
