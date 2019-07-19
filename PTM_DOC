@@ -138,12 +138,16 @@ B. To run PTM:
  Object myParticle is initialized in subroutine "particle_initialize" of module PARTICLES.
  Subroutine "stepper_push" advances a particle with smaller timesteps adding up to the output-file cadence dtOut,
  by updating quantities (position, velocity) of object myParticle in either GC or FO representations.
- The integration timestep of "stepper_push" is set initially in subroutine "particle_initialize" to be a small fraction
- (GLOBAL parameters epsilon_drift=0.1, epsilon_orbit=0.05) of the orbital period/2pi = 1/wc.
- Subroutine "stepper_push" calculates timestep duration dt after each time-step
-   a. IF in FO mode: as above
-   b. IF in GC mode: dt is a fraction epsilon_drift of the timescale at which all accelerations involved (electric, gradient,
-         curvature, mirror) would yield the current particle speed (the "Kress-Hudson heuristic").
+ The integration timestep of "stepper_push" is set initially in subroutine "particle_initialize".
+ Subroutine "stepper_push" re-calculates timestep duration dt after each time advance
+   a. IF in FO mode: dt is a small fraction (GLOBAL parameter epsilon_orbit=0.05) of the orbital period/(2*pi)
+   b. IF in GC mode: dt is a small fraction (GLOBAL parameter epsilon_drift=0.1) of the timescale at which all accelerations
+         involved (electric, gradient, curvature, mirror) would yield the current particle speed (the "Kress-Hudson heuristic")
+
+ The GC mode allows larger timesteps than FO mode, thus GC mode
+  a. leads to shorter simulations
+  b. conserves better particle energy
+  From 1. NOTE above: for energies of interest (E_el < 1 MeV and E_pr > 100 keV), electrons are in GC mode, protons in FO mode.
 
 
  3. PTM and STEPPER time-advancing
@@ -164,23 +168,56 @@ B. To run PTM:
  particle in GC mode.
 
 
- 4. How Long it takes to run a simulation (on HPC) ?
+ 4. How long does it take to run PTM (on HPC) for a FIXED ADVANCING TIME ?
 
- These are run times for PA=90 deg:
- a. On HPC, one timestep advancing in module STEPPER takes ~70 musecs in GC mode, ~50 musecs in FO mode.
- b. GC mode allows much larger timesteps than FO mode.
- c. Larger particle mass increase timestep because of the larger gyration period (for FO mode) or smaller acceleration (for GC mode)
- Example: for B=250 nT (L=6)
-    In GC mode with timestep parameter epsilon_drift=0.1 (in module GLOBAL):
-      for electron: it takes ~100 steps to advance for dtOut=1s, and  12 s to advance for a Thi=3600s simulation
-      for proton:   it takes  few steps to advance for dtOut=1s, and .50 s to advance for Thi=3600s
-    In FO mode with timestep parameter epsilon_orbit=0.05 (in module GLOBAL):
-      for electron: it takes ~1 million steps to advance for dtOut=1s, and 123ks to advance for Thi=3600s (so, don't do that)
-      for proton:   it takes ~hundreds  steps to advance for dtOut=1s, and  55 s to advance for Thi=3600s
- Empirically, run time dep on PA = T(PA=90)*(10-PA/10) musec.
+ 4A. In GC mode
+
+ One timestep advancing by module STEPPER takes ~70 musecs % For an Electron (at L=5), E=100 keV, PA=90 deg
+
+ Timestep size dT is set by particle velocity vel and all accelerations involved acc.
+ Consequently, for a fixed advancing time Thi, run duration Trun depends on particle PA, energy E, and mass m
+ (besides E and B fields): Trun ~1/dT ~vel/acc. If acc~force/m, then a naive expectation would be that
+ Trun ~ 1/sqrt(mE) (after vel~sqrt(E/m)), but not accelerations satisfy acc~1/m.
+
+ Empirically, run-time dependence on
+  a. PA     is = Trun(PA=90)*(10-PA/10) - longer runs for smaller PA
+  b. Energy is ~ E^0.6     at PA=90     - longer runs for higher energy (exponent decreases with PA)
+  c. mass   is ~ m^{-0.4}               - longer runs for smaller mass
+      (but this is not so relevant because only electrons should be in GC mode,
+       while next lightest particle - protons - should be in FO mode).
+ So, Trun ~ sqrt(E/m) --> expectation Trun~sqrt{E} is wrong
+                      --> expectation Trun~1/sqrt{m} is right
+       (despite that accelerations in GC frame are mass-independent !)
+
+ Example: for B=250 nT, a (timestep propto) parameter epsilon_drift = 0.1 (set in module GLOBAL) requires
+  a. ~50 steps to advance an Electron for dtOut=1s, leading to Trun=10s for a Thi=1h simulation
+  b. few steps to advance a  Proton   for dtOut=1s, leading to Trun=.5s for a Thi=1h simulation
+
+ Note: Electron trajectories should be calculated in GC mode because electrons of energy E < 10 MeV satisfy
+       the GC mode's magnetic uniformity criterion (see above) and GC mode timesteps are larger than for FO,
+       so runs are shorter.
 
 
- 5. Integrator of ODE for particle motion.
+ 4B. In FO mode
+
+ One timestep advancing by module STEPPER takes ~50 musecs % For an Electron (at L=5), E=100 keV, PA=90 deg
+
+ Timestep size dT is set by particle gyration period T_g ~ gamma*m/B, thus run duration,
+  a. depends on particle mass Trun ~ 1/m  (relevant for ions, which do not satisfy the GC mode criterion),
+  b. is independent on Energy if particle is non-relativistic (otherwise T_g ~ E and Trun ~ 1/E),
+  c. is dependent on PA through T_g ~ 1/B, with B along the field line depending on (equatorial) PA.
+     Empirically, Trun(PA) = Trun(PA=90)*(0.6+35/PA) - longer runs for smaller PA
+
+ Example: for B=250 nT, a (timestep propto) parameter epsilon_orbit = 0.05 (set in module GLOBAL) requires
+  a. ~2/3 million steps to advance an Electron for dtOut=1s, leading to Trun=20h  for Thi=1h
+  b. ~300         steps to advance a  Proton   for dtOut=1s, leading to Trun=1min for Thi=1h
+
+ Note: Proton trajectories should be calculated in FO mode because protons of energy E > 0.1 MeV do not
+       satisfy GC mode's magnetic uniformity criterion.
+
+
+
+ 5. Integrator of ODE for particle motion
 
  In subroutine "stepper_push", time-integration can be done with either
  a. a fixed timestep Runge-Kutta integrator = subroutine "RK4" in module STEPPER, if istep=1 in file "ptm_parameters" or
