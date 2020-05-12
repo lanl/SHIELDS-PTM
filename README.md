@@ -1,14 +1,16 @@
 PTM - The SHIELDS Particle Tracing Model
 
 Jesse Woodroffe [1]
+Steven Morley [1]
 Thiago Brito [1]
+Alin-Daniel Panaitescu [2]
 Michael Henderson [1]
 Vania Jordanova [1]
 
 [1] Los Alamos National Laboratory
     ISR-1, Space Science & Applications
-
-Last updated 8/22/16 by JRW
+[2] Los Alamos National Laboratory
+    ISR-2, Space and Remote Sensing
 
 ---
 
