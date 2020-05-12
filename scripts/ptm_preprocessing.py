@@ -11,7 +11,7 @@ import numpy as np
 import ptm_read
 import ptm_interpolate
 
-def convertSWMF(files, tec=False):
+def convertSWMF(files, dest_dir, tec=False):
     dtout = 3600.
     times = dtout*np.arange(np.size(files))
     times.tofile(os.path.join(dest_dir, 'tgrid.bin'))
@@ -68,8 +68,8 @@ if __name__ == '__main__':
     opt = parser.parse_args()
     if not opt.fname:
         opt.fname = glob.glob(os.path.join(opt.input_dir, '*.out'))
-    if not os.path.isdir(dest_dir):
-        os.makedirs(dest_dir)
+    if not os.path.isdir(opt.output_dir):
+        os.makedirs(opt.output_dir)
     # If you don't sort first, file order will be unpredictable
     files = np.sort(opt.fname)
-    convertSWMF(files, tec=opt.tec)
+    convertSWMF(files, opt.output_dir, tec=opt.tec)

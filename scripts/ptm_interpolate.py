@@ -27,9 +27,11 @@ __mhdFields = ['Bx','By','Bz','Ux','Uy','Uz']
 def makeTree(fdict, calling='unknown func'):
     # Check that the data file is three-dimensional
     try:
-        myTree = cKDTree(zip(fdict['x'].squeeze(),
-                             fdict['y'].squeeze(),
-                             fdict['z'].squeeze()))
+        inarray = np.empty((len(fdict['x']), 3))
+        inarray[:, 0] = fdict['x'].squeeze()
+        inarray[:, 1] = fdict['y'].squeeze()
+        inarray[:, 2] = fdict['z'].squeeze()
+        myTree = cKDTree(inarray)
     except KeyError:
         missingKeys=''
         if (not fdict.has_key('x')):
@@ -38,7 +40,7 @@ def makeTree(fdict, calling='unknown func'):
             missingKeys+='y '
         if (not fdict.has_key('z')):
             missingKeys+='z'
-        raise Exception('Error in gaussian_interp: '
+        raise Exception('Error in {0}: '.format(calling)
                         + 'fdict does not have expected keys: {'
                         + missingKeys.strip()+ '}')
 
