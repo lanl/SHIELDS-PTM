@@ -1,6 +1,6 @@
 import numpy as np
 
-def read_swmf_tec_file(fname,nheader=5):
+def read_swmf_tec_file(fname, nheader=23):
     """
     READ_SWMF_TEC_FILE
 
@@ -14,32 +14,41 @@ def read_swmf_tec_file(fname,nheader=5):
     # Start by parsing the header
     with open(fname,'r') as f:
         # Skip first line
-        #f.readline()
+        f.readline()
 
         # Second line gives the variable symbols and their units. 
         # Here we do a bunch of string manipulation to put them in an easy-to-read format
-        # varstrs=f.readline().strip().split('=')[1].replace('`','').replace('[','').replace(']','').replace('"','').split(',')
-        # varstrs=f.readline()
-        unit_data={}
-        # for s in varstrs:
-        #     l,r=s.split()
-        #     unit_data[l]=r
-        #     params=f.readline()
+        varstrs = f.readline().strip().split('=')[1].replace('`','').replace('[','').replace(']','').replace('"','').split(',')
+        varstrs = f.readline()
+        unit_data = {}
+        for s in varstrs:
+            l,r=s.split()
+            unit_data[l]=r
+            params=f.readline()
 
     # Get the number of points in the data file
-    #npoints=int(params.split(',')[1].split()[1])
+    npoints = int(params.split(',')[1].split()[1])
 
     # Now we can read the data file
-    # dat=np.genfromtxt(fname,skip_header=nheader,max_rows=npoints)
-    dat=np.genfromtxt(fname,skip_header=nheader,max_rows=None)
+    dat = np.genfromtxt(fname, skip_header=nheader, max_rows=npoints)
 
     # Put the data into a dictionary
-    swmfdata={ 'x':dat[:, 0], 'y':dat[:, 1], 'z':dat[:, 2],
-               'r':dat[:, 3],
-              'ux':dat[:, 4],'uy':dat[:, 5],'uz':dat[:, 6],
-              'bx':dat[:, 7],'by':dat[:, 8],'bz':dat[:, 9],
-               'p':dat[:,10],
-              'jx':dat[:,11],'jy':dat[:,12],'jz':dat[:,13],
-              'units':unit_data}
+    swmfdata={ 'x': dat[:, 0], 'y': dat[:, 1], 'z': dat[:, 2],
+               'r': dat[:, 3],
+              'Ux': dat[:, 4], 'Uy': dat[:, 5], 'Uz': dat[:, 6],
+              'Bx': dat[:, 7], 'By': dat[:, 8], 'Bz': dat[:, 9],
+               'p': dat[:,10],
+              'jx': dat[:,11], 'jy': dat[:,12], 'jz': dat[:,13],
+              'units': unit_data}
+
+    return swmfdata
+
+def read_swmf_idl_file(fname):
+    """Read SWMF IDL files and return dict-like
+
+    Uses same names as tec reader
+    """
+    from spacepy.pybats.bats import IdlFile
+    swmfdata = IdlFile(fname)
 
     return swmfdata

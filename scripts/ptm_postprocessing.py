@@ -171,7 +171,7 @@ class ptm_postprocessor(object):
 
 
 
-    def process_run(self, runid, verbose=False):
+    def process_run(self, runid, verbose=True):
         """
         -------
         Purpose
@@ -211,13 +211,14 @@ class ptm_postprocessor(object):
             flux = self.calculate_flux(fluxmap)
             omni = self.calculate_omnidirectional_flux(fluxmap['angles'],flux)
 
-            results['fluxmap']=fluxmap
-            # results['initial_E']=fluxmap['init_E'] 
-            results['final_E']=fluxmap['final_E'] 
-            results['energies']=fluxmap['energies'] 
-            results['angles']=fluxmap['angles']
-            results['flux']=flux
-            results['omni']=omni
+            results['position']=fluxmap['final_x']
+            #results['fluxmap']=fluxmap
+            #results['initial_E']=fluxmap['init_E'] 
+            #results['final_E']=fluxmap['final_E'] 
+            #results['energies']=fluxmap['energies'] 
+            #results['angles']=fluxmap['angles']
+            #results['flux']=flux
+            #results['omni']=omni
 
             results['kappa']=self.__kappa
             results['n_dens']=self.__n
@@ -228,11 +229,12 @@ class ptm_postprocessor(object):
             raise Exception('Error in process_run: '+fname+ ' not found.')
 
         if verbose:
-            print("Final Particle Energies [PA] : ", '\n', fluxmap['final_E'])
-            print("Energy grid : ", '\n', fluxmap['energies'])
-            print("PitchAngle grid : ", '\n', fluxmap['angles'])
-            print("Diff Flux [E[PA]]: ", '\n', flux)
-            print("Omni Flux [E]: ", '\n', omni)
+
+            print("Energy grid : ", fluxmap['energies'])
+            print("PitchAngle grid : ", fluxmap['angles'])
+            print("Final Particle Energies [PA] : ",  fluxmap['final_E'])
+            print("Diff Flux [E[PA]]: ", flux)
+            print("Omni Flux [E]: ", omni)
 
         return results  
 

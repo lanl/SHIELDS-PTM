@@ -1,53 +1,75 @@
 """
 This script file can be used to interpolate data from an SMWF run. It is assumed
-that the data is in gzipped tecplot-formatted ascii files.
+that the data is in SWMF 3d idl format (binary OR ascii)
+Binary is preferred due to the smaller size on disk
+The ASCII tecplot format is also supported.
 """
-
+import argparse
 import glob
 import os
 import numpy as np
 import ptm_read
 import ptm_interpolate
 
-# If you don't sort first, file order will be unpredictable
-#files = np.sort(glob.glob('*.gz'))
-files = np.sort(glob.glob('*.mhd'))
+def convertSWMF(files, tec=False):
+    dtout = 3600.
+    times = dtout*np.arange(np.size(files))
+    times.tofile(os.path.join(dest_dir, 'tgrid.bin'))
 
-dtout = 3600.
-times = dtout*np.arange(np.size(files))
-times.tofile('ptm_data/tgrid.bin')
+    # Set resolution of data cube for PTM to trace through
+    xwant = np.linspace(-15,15,75)
+    ywant = np.linspace(-15,15,75)
+    zwant = np.linspace(-15,15,75)
 
-xwant = np.linspace(-15,10,75)
-ywant = np.linspace(-10,10,75)
-zwant = np.linspace(-10,10,75)
+    # tofile is a numpy method that dumps binary (which the fortran will read)
+    xwant.tofile(os.path.join(dest_dir, 'xgrid.bin'))
+    ywant.tofile(os.path.join(dest_dir, 'ygrid.bin'))
+    zwant.tofile(os.path.join(dest_dir, 'zgrid.bin'))
 
-xwant.tofile('ptm_data/xgrid.bin')
-ywant.tofile('ptm_data/ygrid.bin')
-zwant.tofile('ptm_data/zgrid.bin')
+    for i, fname in enumerate(files):
+        # The stat variable can be used to handle exceptions
+        #stat=os.system('gunzip '+fname)
 
-for i, fname in enumerate(files):
+        # Parse the newly unzipped file
+        #dat=ptm_read.read_swmf_tec_file(fname[:-3])
+        print('start reading', fname)
+        if tec:
+            # TODO: Also reinstate gzip handling
+            dat = ptm_read.read_swmf_tec_file(fname)
+        else:
+            dat = ptm_read.read_swmf_idl_file(fname)
+        print('done reading file', fname)
 
-    # The stat variable can be used to handle exceptions
-    #stat=os.system('gunzip '+fname)
+        # Interpolate the data
+        res = ptm_interpolate.gauss_interp_EB(xwant, ywant, zwant, dat)
+        print('done interpolating file', fname)
 
-    # Parse the newly unzipped file
-    #dat=ptm_read.read_swmf_tec_file(fname[:-3])
+        i1 = i+1
+        res['Bx'].tofile(os.path.join(dest_dir, 'bx3d_{0:04d}.bin'.format(i1)))
+        res['By'].tofile(os.path.join(dest_dir, 'by3d_{0:04d}.bin'.format(i1)))
+        res['Bz'].tofile(os.path.join(dest_dir, 'bz3d_{0:04d}.bin'.format(i1)))
+        res['Ex'].tofile(os.path.join(dest_dir, 'ex3d_{0:04d}.bin'.format(i1)))
+        res['Ey'].tofile(os.path.join(dest_dir, 'ey3d_{0:04d}.bin'.format(i1)))
+        res['Ez'].tofile(os.path.join(dest_dir, 'ez3d_{0:04d}.bin'.format(i1)))
 
-    print('start reading',fname)
-    dat=ptm_read.read_swmf_tec_file(fname)
-    print('done reading file',fname)
-
-    # Rezip the file
-    #stat=os.system('gzip '+fname[:-3])
-
-    # Interpolate the data
-    res=ptm_interpolate.gauss_interp_EB(xwant,ywant,zwant,dat)
-    print ('done interpolating file',fname)
-
-    i1=i+1
-    res['bx'].tofile('ptm_data/bx3d_%4.4i.bin' % i1)
-    res['by'].tofile('ptm_data/by3d_%4.4i.bin' % i1)
-    res['bz'].tofile('ptm_data/bz3d_%4.4i.bin' % i1)
-    res['ex'].tofile('ptm_data/ex3d_%4.4i.bin' % i1)
-    res['ey'].tofile('ptm_data/ey3d_%4.4i.bin' % i1)
-    res['ez'].tofile('ptm_data/ez3d_%4.4i.bin' % i1)
+if __name__ == '__main__':
+    # Define command-line option parser
+    curr = os.path.abspath(os.path.curdir)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-i', '--input_dir', dest='input_dir',
+                        default=os.path.join(curr, '..', 'ptm_data'))
+    parser.add_argument('-o', '--output_dir', dest='output_dir',
+                        default=os.path.join(curr, '..', 'ptm_data'))
+    parser.add_argument('--tec', dest='tec', action='store_true',
+                        help='Flag to process as TecPlot format. Default is IDL format.')
+    parser.add_argument('fname', nargs='*', help='Filenames to convert to PTM format. '
+                        + 'Any number can be provided. Wildcards assumed to be expanded by shell.\n'
+                        + 'Default is to use *.out from input_dir.')
+    opt = parser.parse_args()
+    if not opt.fname:
+        opt.fname = glob.glob(os.path.join(opt.input_dir, '*.out'))
+    if not os.path.isdir(dest_dir):
+        os.makedirs(dest_dir)
+    # If you don't sort first, file order will be unpredictable
+    files = np.sort(opt.fname)
+    convertSWMF(files, tec=opt.tec)
