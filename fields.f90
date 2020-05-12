@@ -52,7 +52,7 @@ contains
     zgrid = (/0.d0,1.d0/)
   endif
 
-   !A That XYZ grid created by PTM_tec_interp.py in ptm_data/bin files and with its nodes nx*ny*nz
+   !A That XYZ grid created by ptm_preprocessing.py in ptm_data/bin files and with its nodes nx*ny*nz
    !   is read now using the nodes nx,ny,nz specified by PTM_input.py in  ptm_input/ptm_parameters.txt file
    ! The two sets (nx,ny,nz) must match: PTM will crash if you read more grid than available or, if you read less, 
    !   it will get to "XYZ out of bounds" or, worse, it will not stop but will output NaN's after a much longer run.

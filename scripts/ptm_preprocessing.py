@@ -72,4 +72,8 @@ if __name__ == '__main__':
         os.makedirs(opt.output_dir)
     # If you don't sort first, file order will be unpredictable
     files = np.sort(opt.fname)
+    if len(files) == 1:
+        # If only one timestep, make sure we have the file input twice...
+        # Allows in-time interpolation in a static field
+        files = [files[0], files[0]]
     convertSWMF(files, opt.output_dir, tec=opt.tec)

@@ -9,7 +9,7 @@ Further details of how PTM (Particle Tracing Model) works are given in `PTM_doc`
    Create there directories `ptm_data/` and `ptm_input/` and keep there the .mhd magnetic-field--model files
 
    1. `module load python/3.6-anaconda-5.0.1` or any of the python3/anaconda modules 
-   2. `python ptm_tec_interp.py` to create PTM input data files in `ptm_data/` by interpolating the .mhd files 
+   2. `python ptm_preprocessing.py` to create PTM input data files in `ptm_data/` by interpolating the SWMF 3d output files 
    3.  `python` to create PTM input parameter files in `ptm_input/`
 
       ```
@@ -32,10 +32,9 @@ Further details of how PTM (Particle Tracing Model) works are given in `PTM_doc`
    1. load module gfortran, if needed
    2. create a directory `ptm_input/` containing all 3 parameter files created before by `PTM_INPUT.py`
    3. create a directory `ptm_data/` containing all 4+3*2*n data files created before by `PTM_TEC_INTERP.py`
-   Note: PTM needs B&E input files at least two epochs (n >=2). If you have only one input .mhd file,
-         then duplicate the only interpolated (b/e)(x,y,z)3d__0001.dat (n=1) files and call them 
-         (b/e)(x,y,z)_0002.dat (n=2). In this magnetostatic set-up, PTM will do only spatial interpolations
-         to calculate B&E at current particle location.
+   Note: PTM needs B&E input files at least two epochs (n >=2). If you have only one input SWMF file,
+         then ptm_preprocessing will process it twice, making two sets of output files. This allows
+         in-time interpolation for a static field.
    4. `make all` to create executable ptm
    5. `./ptm N` select N (=runid). 
    Note: PTM will read input files in directory `ptm_input/` ending in 000N.txt
@@ -86,7 +85,7 @@ Further details of how PTM (Particle Tracing Model) works are given in `PTM_doc`
 
      python
      >>> import ptm_postprocessing
-     >>> p=ptm_postprocessing.ptm_postprocessor()
-     >>> p.process_run(N) (N must match that of existing PTM output file map_000N.dat)
+     >>> p = ptm_postprocessing.ptm_postprocessor()
+     >>> p.process_run(N)  # (N must match that of existing PTM output file map_000N.dat)
 
    to process Flux-Map output file `map_000N.dat` created with PTM for idist=3,4 in `dist_velocity_000N.txt`
