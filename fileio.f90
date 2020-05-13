@@ -122,7 +122,7 @@ contains
 
 !
 
-  subroutine writeDataStore(dataStore)
+  subroutine writeDataStore(dataStore,tag)
   ! This routine is called by a single thread at a time, so the SAVED firstCall variable is okay: the first thread
   ! to call it should set its status for all other subsequent calls. Theoretically, two threads might try to access
   ! this routine simultaneously (and that could cause problems), so we have to make calls to this routine inside
@@ -131,6 +131,7 @@ contains
   implicit none
 
   real(dp), dimension(:,:), intent(in) :: dataStore
+  integer, intent(in) :: tag
   integer :: i, lun, ierr
   logical, save :: firstCall = .TRUE.
 
@@ -142,9 +143,10 @@ contains
   else
     open(unit=lun,file='ptm_output/ptm_'//id_string//'.dat',action='write',status='old',position='append',iostat=ierr)
     call assert(ierr==0,'writeDataStore','error opening ptm_'//int2str(runid)//'.dat')
-    write(lun,*) '#'
-    ! The # symbol separates data from different particles
   endif
+
+  write(lun,*) '# ', tag
+  ! The # symbol separates data from different particles
 
   do i=1,size(dataStore,1)
     write(lun,'(8es17.7e3)') dataStore(i,:)

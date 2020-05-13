@@ -108,10 +108,11 @@ end type grid
 
 type particle
   real(dp) :: t                                             ! Current time for particle
-  real(dp) :: dt                                            ! Timstep for integrator
+  real(dp) :: dt                                            ! Timestep for integrator
+  integer :: tag                                            ! Particle number
   logical :: drift,integrate                                ! Logical switches
   real(dp), dimension(:), pointer :: x                      ! Position
-  real(dp), dimension(:), pointer :: v                      ! Relativsitic velocity
+  real(dp), dimension(:), pointer :: v                      ! Relativistic velocity
   real(dp), dimension(:), pointer :: y                      ! Actual storage
   real(dp), dimension(3) :: p                               ! Parameters: p(1) = charge/mass ratio; p(2) = particle mass in keV
   real(dp), dimension(2,64) :: bxinterp, byinterp, bzinterp ! Tricubic interpolation coefficients for B

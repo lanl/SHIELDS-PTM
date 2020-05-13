@@ -61,7 +61,9 @@ DO n=1,nparticles
 
   ! write data files
   if(fluxMap) call writeFluxCoordinates(myParticle)
-  if((.not. fluxMap) .or. itraj==1) call writeDataStore(particleData(:iwrite,:))
+  if((.not. fluxMap) .or. itraj==1) then
+    call writeDataStore(particleData(:iwrite,:),n)
+  end if
 
 !$omp end critical
 

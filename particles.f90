@@ -307,6 +307,7 @@ contains
       vz = vtpara*random_gauss()
     case(3:4) ! Set up particle properties for flux map mode
       call assert(present(tag),'particle_initialize','idist=3 requires specification of particle tag in calling routine')
+      myParticle%tag = tag
       iEnergy = ceiling(tag/real(nPitchAngles))
       iPitchAngle = tag-(iEnergy-1)*nPitchAngles
       gam = 1.0+energies(iEnergy)/myParticle%p(2)
