@@ -22,7 +22,7 @@ def cd(newdir):
         os.chdir(prevdir)
 
 
-def setupGPS(opt, runid):
+def setupGPS(opt, runid, nruns, verbose=False):
     # Get size of grid
     indir = os.path.join(opt.input_dir, 'ptm_data')
     # TODO: test for presence of directory and files, if not there, error
@@ -30,58 +30,73 @@ def setupGPS(opt, runid):
     ys = np.fromfile(os.path.join(indir, 'ygrid.bin'))
     zs = np.fromfile(os.path.join(indir, 'zgrid.bin'))
 
-    # TODO: presumably will need to do multiple run definitions here...
-    #       then map them all to a GNU parallel launcher
-    setup = ptm_input.ptm_input_creator(runid=runid,
-                                        idensity=1,  # Point source
-                                        )
+    # break energy space over number of runs...
+    emin = 5.0*1e3  # 5MeV lower limit
+    emax = 100.0*1e3  # 100MeV upper limit
+    nenergy = 100
+    energy_arr = np.linspace(emin, emax, nenergy)
+    per_run = nenergy//nruns
 
-    # Ensure domain resolution is correctly set
-    setup.set_parameters(ndim=3,
-                         nx=xs.shape[0],
-                         ny=ys.shape[0],
-                         nz=zs.shape[0])
+    for runno in range(nruns):
+        imin = per_run*runno
+        imax = per_run*(runno+1)  # exclusive for use in ranges
+        earr = {'min': energy_arr[imin],
+                'max': energy_arr[imax-1],
+                'n_e': len(energy_arr[imin:imax])
+                }
+        # TODO: presumably will need to do multiple run definitions here...
+        #       then map them all to a GNU parallel launcher
+        setup = ptm_input.ptm_input_creator(runid=runid+runno,
+                                            idensity=1,  # Point source
+                                            )
 
-    # Change to flux map mode
-    setup.set_parameters(idist=3)  # TODO: can I get particle 
-                                   # trajectories in the usual
-                                   # format with this mode?
-    # How do I combine multiple "runs"? For efficiency I should
-    # parcel the runs up, probably using smaller ranges in
-    # energy...
-    setup.set_parameters(emin=10000.0,  # Emin in keV [10MeV]
-                         emax=100000.0,  # Emax in keV [100MeV]
-                         phi=-1.0,  # negative phi is randomly-seeded
-                         nenergy=10,  # number of energies
-                         npitch=18,  # number of pitch angles
-                         xsource=-20.0
-                         )
+        # Ensure domain resolution is correctly set
+        setup.set_parameters(ndim=3,
+                             nx=xs.shape[0],
+                             ny=ys.shape[0],
+                             nz=zs.shape[0])
 
-    # Set proton tracing params, incl. full orbit
-    setup.set_parameters(iswitch=1,  # full orbit
-                         itrace=-1,  # backwards in time
-                         charge=1.0, mass=1837.0,  # protons
-                         dtout=0.1, # 0.1s output written
-                         thi=300.0, # max time of 300s
-                         itraj=1,  # 1=write trajectories when in fluxmap mode
-                         )
+        # Change to flux map mode
+        setup.set_parameters(idist=3)  # TODO: can I get particle 
+                                       # trajectories in the usual
+                                       # format with this mode?
+        # How do I combine multiple "runs"? For efficiency I should
+        # parcel the runs up, probably using smaller ranges in
+        # energy...
+        setup.set_parameters(emin=earr['min'],  # Emin in keV
+                             emax=earr['max'],  # Emax in keV
+                             phi=-1.0,  # negative phi is randomly-seeded
+                             nenergy=earr['n_e'],  # number of energies
+                             npitch=18,  # number of pitch angles
+                             xsource=-20.0
+                             )
 
-    # Define point source for tracing
-    setup.set_parameters(x0=opt.start_pos[0],
-                         y0=opt.start_pos[1],
-                         z0=opt.start_pos[2])
+        # Set proton tracing params, incl. full orbit
+        setup.set_parameters(iswitch=1,  # full orbit
+                             itrace=-1,  # backwards in time
+                             charge=1.0, mass=1837.0,  # protons
+                             dtout=0.1, # 0.1s output written
+                             thi=300.0, # max time of 300s
+                             itraj=1,  # 1=write trajectories when in fluxmap mode
+                             )
 
-    # Write required input files to run directory
-    setup.create_input_files(os.path.join(opt.output_dir, 'ptm_input'))
+        # Define point source for tracing
+        setup.set_parameters(x0=opt.start_pos[0],
+                             y0=opt.start_pos[1],
+                             z0=opt.start_pos[2])
 
-    # Verbose output
-    setup.print_settings()
+        # Write required input files to run directory
+        setup.create_input_files(os.path.join(opt.output_dir, 'ptm_input'))
+
+        # Verbose output
+        if verbose:
+            setup.print_settings()
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-r', '--runid', dest='runid', type=int, default=2,
-                        help='Set run ID number. Default is 2.')
+                        help='Set starting run ID number. Default is 2.')
     parser.add_argument('-i', '--input', dest='input_dir',
                         default=None,
                         type=os.path.expanduser,
@@ -134,7 +149,8 @@ if __name__ == '__main__':
 
     # Do setup
     # TODO: break up into multiple runs to pass to GNU parallel
-    setupGPS(opt, opt.runid)
+    nRuns = 3
+    setupGPS(opt, opt.runid, nRuns)
 
     # TODO: have local run option as well as HPC run option (job script)
     if False:
