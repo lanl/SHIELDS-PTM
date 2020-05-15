@@ -80,6 +80,8 @@ def setupGPS(opt, runid):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
+    parser.add_argument('-r', '--runid', dest='runid', type=int, default=2,
+                        help='Set run ID number. Default is 2.')
     parser.add_argument('-i', '--input', dest='input_dir',
                         default=None,
                         type=os.path.expanduser,
@@ -107,8 +109,10 @@ if __name__ == '__main__':
                     mode=0o775, exist_ok=True)
 
     # make symlink to ptm executable
-    if os.path.isfile('ptm'):
-        os.symlink(os.path.abspath('ptm'), os.path.join(opt.output_dir, 'ptm'))
+    exe = os.path.abspath('ptm')
+    link_to = os.path.join(opt.output_dir, 'ptm')
+    if os.path.isfile(exe) and not os.path.isfile(link_to):
+        os.symlink(exe, link_to)
 
     # if required, do preprocessing
     if opt.input_dir is None:
@@ -130,7 +134,7 @@ if __name__ == '__main__':
 
     # Do setup
     # TODO: break up into multiple runs to pass to GNU parallel
-    setupGPS(opt, runid)
+    setupGPS(opt, opt.runid)
 
     # TODO: have local run option as well as HPC run option (job script)
     if False:
