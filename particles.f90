@@ -315,7 +315,7 @@ contains
       vp = v*sind(pitchAngles(iPitchAngle))
       vz = v*cosd(pitchAngles(iPitchAngle))
 
-      myParticle%fluxMapCoordinates = [merge(thi,tlo,itrace<0),x,y,z,energies(iEnergy),pitchAngles(iPitchAngle)]
+      myParticle%fluxMapCoordinates(1:6) = [merge(thi,tlo,itrace<0),x,y,z,energies(iEnergy),pitchAngles(iPitchAngle)]
 
     case default
       call assert(.FALSE.,'particle_initialize','idist='//int2str(idist)//' not supported')
@@ -369,6 +369,8 @@ contains
 
   ! Initialize particle velocity in Cartesian coordinates
   myParticle%v = vz*bhat+vp*rhat
+  ! Store initial cartesian components for flux mapping
+  myParticle%fluxMapCoordinates(7:9) = myParticle%v
 
   if(istep==2) then ! Longer steps with the adaptive RK method
     myParticle%dt = sign(epsilon_drift/abs(myParticle%p(1)*norm(bvec)),real(itrace,dp))   ! dt=sign(itrace)*epsilon/(eB/m)

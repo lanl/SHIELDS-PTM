@@ -1,16 +1,15 @@
 import os
 import numpy as np
 import ptm_tools as pt
+from scipy import constants
 from scipy import special
 from scipy import linalg
 
 class ptm_postprocessor(object):
 
-    __ckm = 2.998e5
-    __csq = 8.988e10
+    __ckm = constants.speed_of_light/1e3
+    __csq = (constants.speed_of_light/1e3)**2
     __mc2 = 5.11e2
-    __dtor = np.pi/180.0
-    __rtod = 180.0/np.pi
 
     """
     -------
@@ -38,13 +37,6 @@ class ptm_postprocessor(object):
 
     Jesse Woodroffe
     jwoodroffe@lanl.gov
-
-    ----------------
-    Revision History
-    ----------------
-
-    6/6/2017    Original code
-
     """
 
     def __init__(self,filedir=None):
@@ -121,16 +113,17 @@ class ptm_postprocessor(object):
         ef = fluxmap['final_E']
         ei = fluxmap['init_E']
 
-        gamf=1+ef/self.__mc2
+        gamf = 1+ef/self.__mc2
 
-        v=self.__ckm*np.sqrt(gamf*gamf-1.0)/gamf
+        v = self.__ckm*np.sqrt(gamf*gamf-1.0)/gamf
 
-        Wc=self.__ec*(1.0-1.5/self.__kappa)
-        f0=self.__n*(self.__mc2/(self.__csq*Wc*2*np.pi*self.__kappa))**1.5*(special.gamma(self.__kappa+1)/special.gamma(self.__kappa-0.5))
-        f=f0*(1+ei/(self.__kappa*Wc))**-(self.__kappa+1)
+        Wc = self.__ec*(1.0-1.5/self.__kappa)
+        f0 = self.__n*(self.__mc2/(self.__csq*Wc*2*np.pi*self.__kappa))**1.5\
+            *(special.gamma(self.__kappa+1)/special.gamma(self.__kappa-0.5))
+        f = f0*(1+ei/(self.__kappa*Wc))**-(self.__kappa+1)
 
         #j=1e5*self.__csq*v*v/self.__mc2*f
-        j=f*1e5*self.__csq*v*v/self.__mc2
+        j = f*1e5*self.__csq*v*v/self.__mc2
 
         return j
 
@@ -159,10 +152,10 @@ class ptm_postprocessor(object):
 
         """
 
-        Q = pav*self.__dtor
+        Q = np.deg2rad(pav)
         coef = 4.0*np.pi*np.diff(Q)
-        favg=0.5*(flux[:,1:]+flux[:,:-1])
-        savg=np.sin(0.5*(Q[1:]+Q[:-1]))
+        favg = 0.5*(flux[:,1:]+flux[:,:-1])
+        savg = np.sin(0.5*(Q[1:]+Q[:-1]))
 
         # This reduction approximates the weighted integral over pitch angles
         omni=np.einsum("i,ji",coef*savg,favg)

@@ -192,7 +192,9 @@ contains
 
   energy = (gam-1.0d0)*myParticle%p(2)
 
-  write(lun,'(7es17.7e3)') myParticle%t, myParticle%x, myParticle%fluxMapCoordinates(5:6), energy
+  ! Write fluxmap data. Time (1), final position (2,3,4), ?? (5,6),
+  ! ?final/initial? energy (7), initial velocity vector (8,9,10)
+  write(lun,'(10es17.7e3)') myParticle%t, myParticle%x, myParticle%fluxMapCoordinates(5:6), energy, myParticle%fluxMapCoordinates(7:9)
 
   close(lun)
 

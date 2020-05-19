@@ -119,7 +119,7 @@ type particle
   real(dp), dimension(2,64) :: exinterp, eyinterp, ezinterp ! Tricubic interpolation coefficients for E
   type(rk_comm_real_1d) :: comm                             ! Communicator for use with RKSuite
   type(grid) :: grid                                        ! 4D grid cell used by interpolators
-  real(dp), dimension(6) :: fluxMapCoordinates              ! Liouville coordinates for quick flux map
+  real(dp), dimension(9) :: fluxMapCoordinates              ! Liouville coordinates for quick flux map
 end type particle
 
 interface read_array

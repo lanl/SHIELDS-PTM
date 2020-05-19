@@ -73,33 +73,39 @@ def parse_map_file(fnames):
     """
     if isinstance(fnames, str):
         fnames = [fnames]
-    
-    res = np.loadtxt(fnames[0], skiprows=1)
+
+    with open(fnames[0]) as fh:
+        header = fh.readline()
+        res = np.loadtxt(fh, skiprows=1)
     for fname in fnames[1:]:
         dum = np.loadtxt(fname, skiprows=1)
         res = np.vstack((res, dum))
 
-    pavec = np.sort(np.unique(res[:, -2]))
-    envec = np.sort(np.unique(res[:, -3]))
+    pavec = np.sort(np.unique(res[:, 5]))
+    envec = np.sort(np.unique(res[:, 4]))
 
-    fluxmap = newDict()
+    sourcepos = header.strip().split()[-3:]
+    fluxmap = newDict(attrs={'position': np.array(sourcepos, dtype=np.float)})
     fluxmap['energies'] = envec
     fluxmap['angles'] = pavec
 
     xfinal = np.zeros([envec.size, pavec.size, 3])
+    vinit = np.zeros([envec.size, pavec.size, 3])
     Einit = np.zeros([envec.size, pavec.size])
     Efinal = np.zeros_like(Einit)
 
     for icount in range(np.size(res, 0)):
-        idex = np.argwhere(res[icount, -3] == envec)
-        jdex = np.argwhere(res[icount, -2] == pavec)
-        Einit[idex, jdex] = res[icount, -3]
-        Efinal[idex, jdex] = res[icount, -1]
+        idex = np.argwhere(res[icount, 4] == envec)
+        jdex = np.argwhere(res[icount, 5] == pavec)
+        Einit[idex, jdex] = res[icount, 4]
+        Efinal[idex, jdex] = res[icount, 6]
         xfinal[idex, jdex, :] = res[icount, 1:4]
+        vinit[idex, jdex, :] = res[icount, 7:10]
 
     fluxmap['init_E'] = Einit
     fluxmap['final_E'] = Efinal
     fluxmap['final_x'] = xfinal
+    fluxmap['init_v'] = vinit
 
     return fluxmap
 
