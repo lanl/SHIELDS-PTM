@@ -6,6 +6,7 @@ Jesse Woodroffe, Steven Morley
 last revised May 2020
 """
 
+from abc import ABC, abstractmethod
 import numpy as np
 from scipy import constants
 from scipy import special
@@ -23,6 +24,59 @@ class newDict(dict):
                 self.attrs = kwargs['attrs']
             del kwargs['attrs']
         super(newDict, self).__init__(*args, **kwargs)
+
+
+class Particle(ABC):
+    """Generic particle container
+
+    Subclass to make proton, etc.
+    """
+    @abstractmethod
+    def __init__(self):
+        self._checkvalues()
+
+    def _checkvalues(self):
+        assert self.energy
+        assert self.charge
+        assert self.restmass
+        assert self.mass
+
+    def getRigidity(self, units='GV'):
+        """Calculate rigidity in GV
+
+        Energy & rest mass energy are in MeV
+        Mass is in atomic mass number
+        Charge is in units of elementary charge (proton is 1, electron is -1)
+        """
+        mcratio = self.mass/self.charge
+        en_part = self.energy**2 + 2*self.energy*self.restmass
+        rigidity_MV = mcratio * np.sqrt(en_part)
+        if units.upper() == 'GV':
+            rigidity = rigidity_MV/1e3
+        else:
+            raise NotImplementedError('Units other than GV for rigidity are not supported')
+        return rigidity
+
+    @classmethod
+    def fromRigidity(cls, rigidity_GV):
+        """Given rigidity in GV, make particle
+        """
+        rmv = rigidity_GV*1e3
+        asq = cls.mass**2
+        rmsq = cls.restmass**2
+        csq = cls.charge**2
+        part = asq*(asq*rmsq + csq*rmv**2)
+        e_k = (np.sqrt(part) - asq*cls.restmass)/asq
+        return cls(e_k)
+
+
+class Proton(Particle):
+    charge = 1
+    mass = 1.00727647  # AMU
+    restmass = 938.27231  # MeV
+    def __init__(self, energy):
+        self.energy = energy
+        super().__init__()
 
 
 def parse_trajectory_file(fname):
