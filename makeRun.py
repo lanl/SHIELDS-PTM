@@ -32,7 +32,7 @@ def setupGPS(opt, runid, nruns, verbose=False):
 
     # break energy space over number of runs...
     emin = 5.0*1e3  # 5MeV lower limit
-    emax = 100.0*1e3  # 100MeV upper limit
+    emax = 150.0*1e3  # 100MeV upper limit
     nenergy = 100
     energy_arr = np.linspace(emin, emax, nenergy)
     per_run = nenergy//nruns
@@ -42,7 +42,7 @@ def setupGPS(opt, runid, nruns, verbose=False):
         imax = per_run*(runno+1)  # exclusive for use in ranges
         earr = {'min': energy_arr[imin],
                 'max': energy_arr[imax-1],
-                'n_e': len(energy_arr[imin:imax])
+                'n_e': per_run if runno != nruns-1 else len(energy_arr[imin:])
                 }
         # TODO: presumably will need to do multiple run definitions here...
         #       then map them all to a GNU parallel launcher
