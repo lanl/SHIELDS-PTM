@@ -1,6 +1,7 @@
 import os
+import glob
 import numpy as np
-import ptm_tools as pt
+from . import ptm_tools as pt
 from scipy import constants
 from scipy import special
 from scipy import linalg
@@ -9,7 +10,7 @@ class ptm_postprocessor(object):
 
     __ckm = constants.speed_of_light/1e3
     __csq = (constants.speed_of_light/1e3)**2
-    __mc2 = 5.11e2
+    __elec_restmass = 5.11e2
 
     """
     -------
@@ -30,27 +31,17 @@ class ptm_postprocessor(object):
     -------
 
     See documentation for individual routines
-
-    ------
-    Author
-    ------
-
-    Jesse Woodroffe
-    jwoodroffe@lanl.gov
     """
 
     def __init__(self,filedir=None):
-
-        if filedir!=None:
-            self.__filedir=filedir
+        if filedir is not None:
+            self.__filedir = os.path.expanduser(filedir)
         else:
-            self.__filedir=os.getcwd()
+            self.__filedir = os.getcwd()
 
         self.__set_defaults = True
 
-
-
-    def set_source_parameters(self,n_dens=1.0,e_char=0.5,kappa=2.5,mass=1.0):
+    def set_source_parameters(self, n_dens=1.0, e_char=0.5, kappa=2.5, mass=1.0):
         """
         -------
         Purpose
@@ -74,16 +65,12 @@ class ptm_postprocessor(object):
         None
 
         """
-
-        self.__mc2 *= mass
+        self.__mc2 = self.__elec_restmass*mass
         self.__ec = e_char
         self.__n = n_dens
         self.__kappa = kappa
 
         self.__set_defaults = False
-
-        return
-
 
     def calculate_flux(self,fluxmap):
         """
@@ -124,9 +111,20 @@ class ptm_postprocessor(object):
 
         #j=1e5*self.__csq*v*v/self.__mc2*f
         j = f*1e5*self.__csq*v*v/self.__mc2
-
         return j
 
+    def _kappa(self, energy):
+        """Kappa function - non-relativistic
+        eqn 10 of Woodroffe et al., 2018
+        """
+        mass = self.__mc2/self.__elec_restmass
+        expo = -(self.__kappa+1)
+        e_kap = self.__ec*(self.__kappa - 3/2)
+        massterm = (mass/(2*np.pi*e_kap))**1.5
+        gamterm = special.gamma(self.__kappa+1)/special.gamma(self.__kappa-0.5)
+        enterm = 1+(energy/e_kap)**expo
+        distfn = self.__n*massterm*gamterm*enterm
+        return distfn
 
 
     def calculate_omnidirectional_flux(self, pav,flux):
@@ -162,21 +160,16 @@ class ptm_postprocessor(object):
 
         return omni
 
-
-
     def process_run(self, runid, verbose=True):
         """
-        -------
-        Purpose
-        -------
-
         Read in the results of a PTM simulation and calculate the fluxes
 
-        ------
-        Inputs
-        ------
-
-        runid       integer     identification tag for run to be analyzed (e.g. 1 for data in map_0001.dat)
+        Parameters
+        ----------
+        runid : integer, list, or None
+            Integer - identification tag for run to be analyzed (e.g. 1 for data in map_0001.dat)
+            List - List of integer ID tags for runs to be combined and analyzed
+            None - Use all map_*.dat files in the selected directory
 
         -------
         Outputs
@@ -193,36 +186,38 @@ class ptm_postprocessor(object):
                                 "e_char"    Characteristic energy of kappa distribution
 
         """
-
-        fname = self.__filedir+'/map_{:04}.dat'.format(runid)
-
         results = {}
 
-        if os.path.isfile(fname):
-
-            fluxmap = pt.parse_map_file(fname)
-            flux = self.calculate_flux(fluxmap)
-            omni = self.calculate_omnidirectional_flux(fluxmap['angles'],flux)
-
-            results['position']=fluxmap['final_x']
-            #results['fluxmap']=fluxmap
-            #results['initial_E']=fluxmap['init_E'] 
-            #results['final_E']=fluxmap['final_E'] 
-            #results['energies']=fluxmap['energies'] 
-            #results['angles']=fluxmap['angles']
-            #results['flux']=flux
-            #results['omni']=omni
-
-            results['kappa']=self.__kappa
-            results['n_dens']=self.__n
-            results['e_char']=self.__ec
-
+        if runid is None:
+            fname = glob.glob(os.path.join(self.__filedir, 'map_*.dat'))
         else:
+            try:
+                # handle an iterable of run IDs
+                fname = [os.path.join(self.__filedir, 'map_{0:04}.dat'.format(ri))
+                         for ri in runid]
+            except IndexError:
+                # fall back to single integer provided
+                fname = self.__filedir+'/map_{:04}.dat'.format(runid)
 
-            raise Exception('Error in process_run: '+fname+ ' not found.')
+        fluxmap = pt.parse_map_file(fname)
+
+        flux = self.calculate_flux(fluxmap)
+        omni = self.calculate_omnidirectional_flux(fluxmap['angles'],flux)
+
+        results['position'] = fluxmap['final_x']
+        #results['fluxmap']=fluxmap
+        results['initial_E']=fluxmap['init_E'] 
+        results['final_E']=fluxmap['final_E'] 
+        results['energies'] = fluxmap['energies'] 
+        results['angles'] = fluxmap['angles']
+        results['flux'] = flux
+        results['omni'] = omni
+
+        results['kappa'] = self.__kappa
+        results['n_dens'] = self.__n
+        results['e_char'] = self.__ec
 
         if verbose:
-
             print("Energy grid : ", fluxmap['energies'])
             print("PitchAngle grid : ", fluxmap['angles'])
             print("Final Particle Energies [PA] : ",  fluxmap['final_E'])
@@ -230,8 +225,6 @@ class ptm_postprocessor(object):
             print("Omni Flux [E]: ", omni)
 
         return results  
-
-
 
     def seconds_to_hhmmss(self,tsec):
         """
@@ -262,8 +255,6 @@ class ptm_postprocessor(object):
 
         return int(hh), int(mm), int(ss)
 
-
-
     #------Here we define RAM-specific routines----->
 
     def process_ram_boundary(self,griddir=None,write_files=True,outdir=None,date={'year':2000,'month':1,'day':1}):
@@ -277,17 +268,13 @@ class ptm_postprocessor(object):
         """
 
         if griddir==None:
-
             mydir = self.__filedir
-
         else:
-
             mydir = griddir
 
         fname = mydir+'/rungrid.txt'
 
         if os.path.isfile(fname):
-
             rungrid = np.loadtxt(fname,skiprows=1)
 
             # This is backwards tracing, so fluxes will be calculated at the later
@@ -308,9 +295,7 @@ class ptm_postprocessor(object):
 
             for runid in runids:
                 fluxdata[runid] = self.process_run(runid)
-
         else:
-
             raise Exception('Error in process_rungrid: '+fname+' not found')
 
         if(write_files):
@@ -318,12 +303,10 @@ class ptm_postprocessor(object):
 
         return fluxdata
 
-
     def write_ram_fluxes(self,fluxdata,date={'year':2000,'month':1,'day':1},outdir=None):
         """
         Write time- and space-dependent fluxes in a RAM boundary file
         """
-
         cadence=(fluxdata['times'][1]-fluxdata['times'][0])//60
 
         year = date['year']
@@ -349,7 +332,6 @@ class ptm_postprocessor(object):
         timeFormat='{:4}-{:02}-{:02}T{:02}:{:02}:{:02}.000Z'
 
         with open(fname,'w') as f:
-
             f.writelines(header1);
             f.writelines(header2);
             f.writelines(header3);
@@ -364,5 +346,3 @@ class ptm_postprocessor(object):
                     # Note asterisk in format statement (*np.r_), this is required for correct passing of values
                     dataline = timeFormat.format(year,month,day,hour,minute,second)+dataFormat.format(*np.r_[mlt,saflux])+'\n'
                     f.writelines(dataline)
-
-        return
