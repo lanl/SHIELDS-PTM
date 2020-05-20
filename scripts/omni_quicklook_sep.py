@@ -50,7 +50,7 @@ def plot_omni(omni, fluxmap):
     ax0.set_ylabel('Diff. Flux [per MeV]')
     ax0.set_title(fluxmap.attrs['position'])
     
-    cdict, allow = cutoffs(fluxmap, addTo=ax0, linestyle='--', color='b')
+    cdict, allow = cutoffs(fluxmap, addTo=ax0, linestyle='--', color='b', label_pre='Omni')
     #ax0.axvline(x=cdict['ec_low'], linestyle=':', color='k',
     #            label='E$_{c}^{low}$ = ' + '{0:.2f} MeV'.format(cdict['ec_low']))
     #ax0.axvline(x=cdict['ec_high'], linestyle=':', color='k',
@@ -106,9 +106,12 @@ def cutoffs(fluxmap, addTo=None, **kwargs):
             kwargs['linestyle'] = '--'
         if 'color' not in kwargs:
             kwargs['color'] = 'b'
+        labeltext = 'E$_{c}^{eff}$ = ' + '{0:.2f} MeV'.format(cdict['ec_eff'])\
+                    + '\nR$_C$ = ' + '{0:.2f} GV'.format(cdict['r_eff'])
+        if 'label_pre' in kwargs:
+            labeltext = kwargs['label_pre'] + '\n' + labeltext
         addTo.axvline(x=cdict['ec_eff'], linestyle=kwargs['linestyle'], color=kwargs['color'],
-                      label='E$_{c}^{eff}$ = ' + '{0:.2f} MeV'.format(cdict['ec_eff'])
-                      + '\nR$_C$ = ' + '{0:.2f} GV'.format(cdict['r_eff']))
+                      label=labeltext)
     return cdict, allow
 
 
@@ -140,7 +143,7 @@ if __name__ == '__main__':
     fig, axes = plot_omni(omni, fluxmap)
     omni2 = calculate_omni(fluxmap_2, initialE=True)
     add_extra_omni(axes[0], omni1, fluxmap_1, label='CXD', color='orange')
-    cdict1, allow1 = cutoffs(fluxmap_1, addTo=axes[0], linestyle='--', color='orange')
-    add_extra_omni(axes[0], omni2, fluxmap_2, label='Initial')
+    #cdict1, allow1 = cutoffs(fluxmap_1, addTo=axes[0], linestyle='--', color='orange')
+    add_extra_omni(axes[0], omni2, fluxmap_2, label='Initial', color='green')
     axes[0].legend()
     plt.show()
