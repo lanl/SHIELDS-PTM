@@ -68,6 +68,8 @@ def setupGPS(opt, runid, nruns, verbose=False):
                              phi=-1.0,  # negative phi is randomly-seeded
                              nenergy=earr['n_e'],  # number of energies
                              npitch=18,  # number of pitch angles
+                             pamin=0,
+                             pamax=180,
                              xsource=-20.0
                              )
 
