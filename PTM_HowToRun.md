@@ -5,7 +5,7 @@ Further details of how PTM (Particle Tracing Model) works are given in `PTM_doc`
 
 ## A. Prepare PTM input files
 
-   Python3 scripts to prepare PTM input files should be in directory scripts/.
+   Python3 code to prepare PTM input files should be in directory ptm_python/.
    Create there directories `ptm_data/` and `ptm_input/` and keep there the .mhd magnetic-field--model files
 
    1. `module load python/3.6-anaconda-5.0.1` or any of the python3/anaconda modules 

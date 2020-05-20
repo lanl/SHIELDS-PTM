@@ -8,7 +8,7 @@ import subprocess
 from contextlib import contextmanager
 import numpy as np
 
-from scripts import ptm_input
+from ptm_python import ptm_input
 
 
 @contextmanager
@@ -32,8 +32,8 @@ def setupGPS(opt, runid, nruns, verbose=False):
 
     # break energy space over number of runs...
     emin = 5.0*1e3  # 5MeV lower limit
-    emax = 150.0*1e3  # 100MeV upper limit
-    nenergy = 100
+    emax = 200.0*1e3  # 100MeV upper limit
+    nenergy = 200
     energy_arr = np.linspace(emin, emax, nenergy)
     per_run = nenergy//nruns
 
@@ -141,7 +141,7 @@ if __name__ == '__main__':
                    ]
         if opt.tec:
             arglist.append("--tec")
-        with cd('scripts'):
+        with cd('ptm_python'):
             print(os.path.abspath(os.curdir))
             subprocess.run(arglist)
             print('Done preprocessing')
@@ -149,7 +149,7 @@ if __name__ == '__main__':
 
     # Do setup
     # TODO: break up into multiple runs to pass to GNU parallel
-    nRuns = 3
+    nRuns = 4
     setupGPS(opt, opt.runid, nRuns)
 
     # TODO: have local run option as well as HPC run option (job script)

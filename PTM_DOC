@@ -2,7 +2,8 @@
 
 A. Preparing PTM input files
 
-   Python3 scripts to prepare PTM input files are in directory scripts/
+   Python3 scripts and modules to prepare PTM input files are in directory ptm_python/
+   Some more specialized scripts for specific applications are in directory scripts/
    Create directories ptm_data/ and ptm_input/ and keep there the .mhd magnetic-field--model files
 
    Module PTM_TEC_INTERP.py
