@@ -1,10 +1,11 @@
 import os
 import glob
 import numpy as np
-from . import ptm_tools as pt
 from scipy import constants
 from scipy import special
 from scipy import linalg
+# local directory import
+import ptm_tools as pt
 
 class ptm_postprocessor(object):
 
@@ -113,18 +114,26 @@ class ptm_postprocessor(object):
         j = f*1e5*self.__csq*v*v/self.__mc2
         return j
 
+
     def _kappa(self, energy):
         """Kappa function - non-relativistic
         eqn 10 of Woodroffe et al., 2018
         """
+        # General quantities
+        rel_gamma = 1 + energy/self.__mc2
         mass = self.__mc2/self.__elec_restmass
+        vel = self.__ckm*np.sqrt(rel_gamma*rel_gamma - 1)/rel_gamma
+        p_squared = self.csq*vel*vel
+        # Kappa specific stuff
         expo = -(self.__kappa+1)
         e_kap = self.__ec*(self.__kappa - 3/2)
         massterm = (mass/(2*np.pi*e_kap))**1.5
         gamterm = special.gamma(self.__kappa+1)/special.gamma(self.__kappa-0.5)
         enterm = 1+(energy/e_kap)**expo
         distfn = self.__n*massterm*gamterm*enterm
-        return distfn
+        # Convert distribution function `to flux
+        flux = 1e5*p_squared
+        return flux
 
 
     def calculate_omnidirectional_flux(self, pav,flux):

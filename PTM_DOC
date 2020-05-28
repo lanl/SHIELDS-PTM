@@ -4,40 +4,43 @@ A. Preparing PTM input files
 
    Python3 scripts and modules to prepare PTM input files are in directory ptm_python/
    Some more specialized scripts for specific applications are in directory scripts/
-   Create directories ptm_data/ and ptm_input/ and keep there the .mhd magnetic-field--model files
+   Create directories ptm_data/ and ptm_input/ and keep there the magnetic-field-model files
 
-   Module PTM_TEC_INTERP.py
-   1. creates in directory ptm_data/
+   Module ptm_preprocessing.py
+   1. creates in directory [rundir/]ptm_data/
       a. a time-array "tgrid.bin" with epochs of all input n>1 .mhd files (select their cadence "dtout"),
-        (this time-grid will be used only if dtIn=<0 in file "ptm_paramaters", see below for PTM input).
+        (this time-grid will be used only if dtIn=<0 in file "ptm_parameters", see below for PTM input).
       b. a uniform "x/y/zgrid.bin" for E&B (choose wanted spatial grid on lines 21-23 and the number of nodes).
    2. calls "ptm_read.py" to read input ascii files ".mhd" (at all n epochs).
-      Currently, the first nheader=5 lines of that input file are skipped, adjust accordingly.
-      The input .mhd file must have following variables in this order
+      The Tecplot format files must use a specific output format (currently not documented, probably `3d MHD tec`)
+      A nominal column layout is given here:
        x   y   z   rho    ux   uy   uz    bx  by  bz   P    jx     jy     jz
        RE  RE  RE  Mp/cc  km/s km/s km/s  nT  nT  nT   nPa  muA/m2 muA/m2 muA/m2
+      The IDL format files use the flexible reader from SpacePy and hence any supported format
+      can be used.
    3. calls function "gauss_interp_EB" of module "ptm_interpolate.py"
       a. to interpolate B from the SWMF mesh (of .mhd) to the uniform XYZ grid created above (1b)
-      b. to calculate electric field E=-uxB and write files "e(x,y,z)3d_000n.bin"
-   1  c. write files "b(x,y,z)3d_000n.bin" at all n input epochs
+      b. to calculate electric field E=-uxB and write files "e(x,y,z)3d_????.bin"
+   1  c. write files "b(x,y,z)3d_????.bin" at all n input epochs
 
    IMPORTANT: The B/E data_input files do not contain the XYZ grid. You must use XYZ and B/E files
-      that were both created with same run of PTM_TEC_INTERP.
+      that were both created with same run of `ptm_preprocessing.py`
 
-   Module PTM_INPUT.py outputs in directory ptm_input/
-    a. file "ptm_parameters_000N.txt" (with N=runid above) containing global pars:
+   Module `ptm_input.py` will generate run configuration files in directory ptm_input/
+    a. file "ptm_parameters_????.txt" (with ????=4-digit zero-padded runid above) containing global pars:
          number of particles, number of nx,ny,nz cells, number of timesteps
-         cadence in output trajectory file ptm_output/ptm_000N.dat
-         cadence of input E&B files ptm_data/ebxyz_000N.bin
-         indices ifirst and ilast of first/last epochs of E&B files to be read by PTM, ETC
+         cadence in output trajectory file ptm_output/ptm_????.dat
+         cadence of input E&B files in ptm_data (note that the 4-digit number on these files
+         indicates the timestep, and these files are used by ALL runs)
+         indices ifirst and ilast of first/last epochs of E&B files to be read by PTM, etc.
        IMPORTANT:  Choose these global pars and make sure that the spatial grid has same number of nodes 
-                   nx*ny*nz as outputted by module PTM_TEC_INTERP in "ptm_parameters" file (see 1b above).
-    b. file "dist_density_000N.txt" with parameters for the spatial distribution:
+                   nx*ny*nz as outputted by module `ptm_preprocessing.py` in "ptm_parameters" file (see 1b above).
+    b. file "dist_density_????.txt" with parameters for the spatial distribution:
        first line:
          idens=1 -> single-location in RE
          idens=2 -> cube corners in RE
          idens=3 -> fixed radial distance in RE in equatorial plane, MLT range in hours
-    c. file "dist_velocity_000N.txt" with parameters for the energy/PA distributions:
+    c. file "dist_velocity_????.txt" with parameters for the energy/PA distributions:
        first line:
          idist=1 -> single E/keV, single PA/deg, single or random phase angle
          idist=2 -> vtperp and vtpara in km/s, single or random phase angle
@@ -50,7 +53,7 @@ A. Preparing PTM input files
 
 --------------
 
-    NOTE: The two scripts, PTM_TEC_INTERP.py and PTM_INPUT.py, for preparing the PTM input files have in common
+    NOTE: The two scripts, ptm_preprocessing.py and ptm_input.py, for preparing the PTM input files have in common
          only one thing: the number of XYZ grid nodes nx*ny*nz, and you must use the same nx,ny,nz in both codes 
          or, else, PTM will crash, get to "X/Y/Z out of bounds" or churn out lots of NaN's, without telling you why.
          See A2.1.b and A3.a/NOTE above.
@@ -59,18 +62,14 @@ A. Preparing PTM input files
 
 B. To run PTM:
 
-  On Scheme, to integrate particle motion over 3600s (SKM claims that that corresponds to approximately 1 hour), 
-  PTM takes 2*(100-PA_deg) sec (sic!), 2/3 of that on HPC/grizzly.
-
-
  I. INPUT 
     The SHIELDS-PTM simulation is configured using following files:
 
- 1a. General parameters are in file "ptm_input/ptm_parameters_000N.txt"
+ 1a. General parameters are in file "ptm_input/ptm_parameters_????.txt"
    called by subroutine "read_ptm_parameters" in module FILEIO
    sets global parameters for simulation (see above)
 
- 1b. Particle spatial distribution is in file "ptm_input/dist_density_000N.txt"
+ 1b. Particle spatial distribution is in file "ptm_input/dist_density_????.txt"
    called by subroutine "particle_initialize" in module PARTICLES
    (particle location goes into object myParticle%x)
    cases on first line:
@@ -79,7 +78,7 @@ B. To run PTM:
      idens=3 -> random MLT and fixed radial distance in equatorial plane
    there is no user-specified spatial distribution
 
- 1c. Particle energy/PA distribution is in file "ptm_input/dist_velocity_000N.txt"
+ 1c. Particle energy/PA distribution is in file "ptm_input/dist_velocity_????.txt"
    called by subroutine "particle_initialize" in module PARTICLES
    (to initialize vpara and vperp distributions of object myParticle%v in Cartesian XYZ coordinates,
       for use in orbit equations (iswitch=1 in file ptm_parameters))
@@ -98,7 +97,7 @@ B. To run PTM:
          with nt = ilast-ifirst (from ptm_parameters) = number of E&B input files
        If dtIn=<0, then time-grid (for E&B) Tmin-Tmax is read from file "ptm_data/tgrid.bin" 
 
-    1d2. Files "ptm_data/(b,e)(x,y,z)3d_000N.bin" contain E&B at epochs from N=ifirst to N=ilast (see ptm_parameters)
+    1d2. Files "ptm_data/(b,e)(x,y,z)3d_????.bin" contain E&B at epochs from N=ifirst to N=ilast (see ptm_parameters)
        They are read by subroutine "fields_initialize" in module FIELDS
        Subroutine "get_fields" in module FIELDS calculates B and E
          at any point in the simulation cube through interpolation (calls subroutine tricubic_interpolate in module INTERPOLATION)
@@ -229,10 +228,10 @@ B. To run PTM:
 
  6. Particle periodic motions
 
- "ptm_N.dat" trajectory file has cadence dtOut=1 sec (set in file "ptm_parameters_N.txt").
+ "ptm_????.dat" trajectory file has cadence dtOut=1 sec (set in file "ptm_parameters_????.txt").
  a. Gyration period is Tgyr = 0.14ms*(250nT/B) for electrons, a factor mp/me=1837 larger for protons -> 0.26s
      (independent of particle energy E for non-relativistic particles)
-    Conclusion: particle orbit is (much) under-sampled in output file "ptm_N.dat"
+    Conclusion: particle orbit is (much) under-sampled in output file "ptm_????.dat"
  b. Bounce period is Tb = (0.6-0.9)s*sqrt(100keV/E)*(R/5RE) for non-rel electrons, a factor sqrt(mp/me)=43 larger for protons
      coefficient is weakly dependent on pitch angle because mirror point goes to a larger zmax with decreasing PA but vpara
       increases with decr PA, so that zmax/cos(PA) is "stiff", from PTM: coeff=0.58 for PA=80, coef=0.93 for PA=10
@@ -243,15 +242,16 @@ B. To run PTM:
       factor 1: smaller PA implies smaller vperp in equatorial plane and smaller spatial drift velocity
       factor 2: smaller PA implies access to higher latitudes, where the angular drift is larger for constant drift velocity,
       1 & 2 compensate each other).
-  Conclusion: drift motion is well-sampled in output file "ptm_N.dat"
+  Conclusion: drift motion is well-sampled in output file "ptm_????.dat"
 
 
  III. OUTPUT
 
  The PTM simulation outputs in two different types of output files:
- "ptm.dat" if idist=1,2 (monoenergetic particles/Maxwellian distribution)
- "map.dat" if idist=3,4 (uniform E&PA distributions/user-specified flux map mode)
+ "ptm_????.dat" if idist=1,2 (monoenergetic particles/Maxwellian distribution)
+ "map_????.dat" if idist=3,4 (uniform E&PA distributions/user-specified flux map mode)
  (idist from "dist_velocity" file)
+ The ptm trajectory files can be enabled for fluxmap mode.
 
  The "ptm" output file contains trajectories for each particle in the simulation,
  Time    X-Pos   Y-Pos   Z-Pos   gamma*Vperp   gamma*Vpara   Energy   PitchAngle
@@ -267,6 +267,7 @@ B. To run PTM:
   Time  X-Pos   Y-Pos   Z-Pos (at end)
   Energy  PitchAngle          (at start)
   Energy                      (at end)
+  Velocity (Cartesian)        (at start)
  (run-end is initial-time if itrace = -1 = trace backwards from start, or final-time if itrace = 1 = trace forward from start)
  Trajectories are, obviously, not recorded.
 
@@ -283,11 +284,11 @@ B. To run PTM:
 
  C. Processing of PTM output
 
- Module PTM_PROCESSING.py processes PTM output file map_000N.dat
+ Module ptm_postprocessing.py processes PTM output fluxmap files
    to produce differential and omni-directional fluxes on the grid of Energies and PitchAngles
    created by PTM with options idist=3 (uniform grid) or idist=4 (user-specified grid) (see above).
 
- Method "PTM_PROCESSING/process_run" calls
+ Method "ptm_postprocessing.process_run" calls
   1. "parse_map_file" of module PTM_TOOLS.py" to read the "map" file
        and create a raw-flux dictionary fluxmap, which is further used by
   2. "calculate_flux" that yields differential flux for an assumed initial particle kappa-distribution 

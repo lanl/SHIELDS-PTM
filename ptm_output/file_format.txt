@@ -1,0 +1,34 @@
+ptm_????.dat
+============
+The ptm files contain particle trajectories.
+Each particle has its time history printed in a block. The block is prefixed by
+a hash '#' and then the number of the particle in the simulation. If the run
+traced multiple particles, these will all be in the same ptm file. The order of
+writing the particles will not necessarily correspond to the numeric ordering
+of particles being simulated.
+
+Each file will have 8 columns and an unknown number of rows. The columns are:
+TIME XPOS YPOS ZPOS VPERP VPARA ENERGY PITCHANGLE
+
+In each line the values correspond to the time given in the first column.
+
+
+map_????.dat
+============
+The map files are output in fluxmap mode. Each line represents a different
+particle with a unique energy, pitch angle, and phase angle. Time history is
+not given in this mode. Initial and final quantities required for flux mapping
+are included in this file. As with the ptm files, the particles are not
+necessarily written in numeric order.
+
+Each file will have a header line that gives the initial position for the
+particles being traced.
+
+Each file will have 10 columns and the number of rows will correspond to the
+number of particles in that run. The columns are:
+TIME XPOS YPOS ZPOS IENERGY PITCHANGLE FENERGY VX VY VZ
+
+In each line the position (XPOS, YPOS, ZPOS) is the final position of the
+traced particle. IENERGY and PITCHANGLE are the initial energy and pitch angle
+of the particle. FENERGY is the final energy of the particle. The initial
+velocity of the particle in Cartesian coordinates is given by (VX, VY, VZ).

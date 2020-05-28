@@ -1,14 +1,25 @@
 # Quickstart guide for PTM
 
 Any shell commands in-text are given in backticks (or rendered in a code environment).
-Further details of how PTM (Particle Tracing Model) works are given in `PTM_doc`
+Further details of how PTM (Particle Tracing Model) works are given in `PTM_DOC`
 
 ## A. Prepare PTM input files
 
-   Python3 code to prepare PTM input files should be in directory ptm_python/.
-   Create there directories `ptm_data/` and `ptm_input/` and keep there the .mhd magnetic-field--model files
+   Magnetic and electric field input files are required by PTM for tracing particles.
+   For the purposes of this quickstart we assume that these files will be generated from
+   Space Weather Modeling Framework output.
 
-   1. `module load python/3.6-anaconda-5.0.1` or any of the python3/anaconda modules 
+   Preparing the PTM input files is done using the `ptm_preprocessing.py` Python script.
+   Supported SWMF filetypes include the various `idl` file formats, as well as the ASCII
+   Tecplot format. The `idl` binary files are preferred due to their smaller size.
+   Either `MHD` or `FUL` outputs should be used as these provide the required information
+   for PTM.
+
+   To use the `ptm_python` tools, first ensure that you have a Python 3 environment with
+   numpy, scipy, matplotlib and spacepy installed. On institutional computing, this is
+   accomplished with modules, e.g.:
+
+   1. `module load python/3.6-anaconda-5.0.1`
    2. `python ptm_preprocessing.py` to create PTM input data files in `ptm_data/` by interpolating the SWMF 3d output files 
    3.  `python` to create PTM input parameter files in `ptm_input/`
 
@@ -25,20 +36,24 @@ Further details of how PTM (Particle Tracing Model) works are given in `PTM_doc`
 
       if you want to select all input parameters interactively
 
+      A testcase for SEP access is provided. Simply use the `makeRun.py` script and
+      this will generate the required input files. Help can be obtained by using the
+      `--help` option, e.g., `python makeRun.py --help`
+
 ## B. Running PTM
 
 ### Single process
 
-   1. load module gfortran, if needed
-   2. create a directory `ptm_input/` containing all 3 parameter files created before by `PTM_INPUT.py`
-   3. create a directory `ptm_data/` containing all 4+3*2*n data files created before by `PTM_TEC_INTERP.py`
+   1. Ensure your environment has the same dependencies as at build time. E.g., `module load gcc/8.1.0`
+   2. create a directory `ptm_input/` containing all 3 parameter files created before by `ptm_input.py`
+   3. create a directory `ptm_data/` containing all 4+3*2*n data files created before by `ptm_preprocessing.py`
    Note: PTM needs B&E input files at least two epochs (n >=2). If you have only one input SWMF file,
          then ptm_preprocessing will process it twice, making two sets of output files. This allows
          in-time interpolation for a static field.
    4. `make all` to create executable ptm
    5. `./ptm N` select N (=runid). 
-   Note: PTM will read input files in directory `ptm_input/` ending in 000N.txt
-                  write output file `ptm_output/ptm_000N.dat`
+   Note: PTM will read input files in directory `ptm_input/` ending in ????.txt
+                  write output file `ptm_output/ptm_????.dat`
 
 ### Multiprocessing
    1. Make a run directory on scratch, e.g.,
