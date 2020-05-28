@@ -1,2 +1,5 @@
+ptm
 *.mod
 *.o
+*.pyc
+ptm_output/*.dat
