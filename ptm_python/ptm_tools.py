@@ -130,13 +130,13 @@ def parse_map_file(fnames):
 
     with open(fnames[0]) as fh:
         header = fh.readline()
-        res = np.loadtxt(fh, skiprows=1)
+        lines = np.loadtxt(fh)
     for fname in fnames[1:]:
         dum = np.loadtxt(fname, skiprows=1)
-        res = np.vstack((res, dum))
+        lines = np.vstack((res, dum))
 
-    pavec = np.sort(np.unique(res[:, 5]))
-    envec = np.sort(np.unique(res[:, 4]))
+    pavec = np.sort(np.unique(lines[:, 5]))
+    envec = np.sort(np.unique(lines[:, 4]))
 
     sourcepos = header.strip().split()[-3:]
     fluxmap = newDict(attrs={'position': np.array(sourcepos, dtype=np.float)})
@@ -148,13 +148,14 @@ def parse_map_file(fnames):
     Einit = np.zeros([envec.size, pavec.size])
     Efinal = np.zeros_like(Einit)
 
-    for icount in range(np.size(res, 0)):
-        idex = np.argwhere(res[icount, 4] == envec)
-        jdex = np.argwhere(res[icount, 5] == pavec)
-        Einit[idex, jdex] = res[icount, 4]
-        Efinal[idex, jdex] = res[icount, 6]
-        xfinal[idex, jdex, :] = res[icount, 1:4]
-        vinit[idex, jdex, :] = res[icount, 7:10]
+    # loop over all loaded data
+    for line in lines:
+        idex = np.argwhere(line[4] == envec)[0][0]
+        jdex = np.argwhere(line[5] == pavec)[0][0]
+        Einit[idex, jdex] = line[4]
+        Efinal[idex, jdex] = line[6]
+        xfinal[idex, jdex, :] = line[1:4]
+        vinit[idex, jdex, :] = line[7:10]
 
     fluxmap['init_E'] = Einit
     fluxmap['final_E'] = Efinal
