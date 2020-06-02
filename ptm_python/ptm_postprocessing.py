@@ -73,7 +73,7 @@ class ptm_postprocessor(object):
 
         self.__set_defaults = False
 
-    def calculate_flux(self,fluxmap):
+    def calculate_flux(self,fluxmap, kind='kappa'):
         """
         -------
         Purpose
@@ -93,6 +93,10 @@ class ptm_postprocessor(object):
 
         j           array(float)    Differential flux
 
+        --------
+        See Also
+        --------
+        calculate_flux (method) in ptm_postprocessing
         """
 
         if self.__set_defaults:
@@ -101,17 +105,30 @@ class ptm_postprocessor(object):
         ef = fluxmap['final_E']
         ei = fluxmap['init_E']
 
-        gamf = 1+ef/self.__mc2
+        gami = 1 + ei/self.__mc2
+        gamf = 1 + ef/self.__mc2
 
+        # velocity corresponding to final energy
         v = self.__ckm*np.sqrt(gamf*gamf-1.0)/gamf
 
-        Wc = self.__ec*(1.0-1.5/self.__kappa)
-        f0 = self.__n*(self.__mc2/(self.__csq*Wc*2*np.pi*self.__kappa))**1.5\
-            *(special.gamma(self.__kappa+1)/special.gamma(self.__kappa-0.5))
-        f = f0*(1+ei/(self.__kappa*Wc))**-(self.__kappa+1)
+        if kind.lower() == 'maxwell':
+            # Maxwell-Juttner distribution
+            # TODO: verify and determine why the Bessel fn returns 0 at standard values
+            Q = self.__ec/self.__mc2
+            f0 = self.__n/(4*np.pi*self.__ckm**3*Q*special.kn(2, 1.0/Q))
+            f = f0*np.exp(-gami/Q)
+        elif kind.lower() == 'kappa':
+            # Kappa distribution
+            Wc = self.__ec*(1.0-1.5/self.__kappa)
+            f0 = self.__n*(self.__mc2/(self.__csq*Wc*2*np.pi*self.__kappa))**1.5\
+                *(special.gamma(self.__kappa+1)/special.gamma(self.__kappa-0.5))
+            f = f0*(1+ei/(self.__kappa*Wc))**-(self.__kappa+1)
+        else:
+            raise ValueError('calculate_flux: kind={0} is not supported'.format(kind))
 
-        #j=1e5*self.__csq*v*v/self.__mc2*f
+        # map to final energy and convert to diff. flux.
         j = f*1e5*self.__csq*v*v/self.__mc2
+
         return j
 
 

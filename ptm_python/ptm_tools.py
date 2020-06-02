@@ -200,8 +200,9 @@ def energy_to_flux(ei, ef, ec, n, mc2=511.0, kind='kappa', kap=2.5, energyFlux=F
     differs from ion temperature, up to a factor of 7 different. It is up to the user to make sure
     that the correct temperature for the desired species is provided.
 
-    Jesse Woodroffe
-    3/30/2016
+    See Also
+    --------
+    calculate_flux (method) in ptm_postprocessing
     """
 
     gami = 1 + ei/mc2
@@ -213,6 +214,7 @@ def energy_to_flux(ei, ef, ec, n, mc2=511.0, kind='kappa', kap=2.5, energyFlux=F
 
     if kind.lower() == 'maxwell':
         # Maxwell-Juttner distribution
+        # TODO: verify and determine why the Bessel fn returns 0 at standard values
         Q = ec/mc2
         f0 = n/(4*np.pi*ckm**3*Q*special.kn(2, 1.0/Q))
         f = f0*np.exp(-gami/Q)
