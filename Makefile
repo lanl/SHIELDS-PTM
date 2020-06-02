@@ -1,57 +1,35 @@
 
-SHELL = /bin/sh
-
-#F90 = ifort            
-# Code currently doesn't compile under gfortran because of our use of [] for initializing two-dimensional array constants
-# That does not seem to be an issue. Instead, problem is that gfortran compiler does not allow local function passing
-#       see comments at top of module STEPPER
+PROG = ptm
 F90 = gfortran
-
-#OPT = -O3 -xhost -implicitnone -ftrapuv -traceback -check bounds -warn all -openmp-stubs
-#OPT = -implicitnone -O3 -xhost -mkl -openmp-stubs -pad
-#OPT = -implicitnone -O3 -xhost -pad
-#OPT = -O0 -implicitnone -ftrapuv -traceback -check bounds -openmp -warn all
-#OPT = -implicitnone -O3 -xhost -openmp -pad -mkl
-#OPT = -implicitnone -O3 -xhost -openmp -pad -ipo -mkl
-#OPT = -ffree-form -ffree-line-length-none -std=f2008ts -O3 -lgomp -ffpe-trap=invalid -fbacktrace
-#OPT = -ffree-form -ffree-line-length-none -std=f2008 -fopenmp -O3 
-
 OPT = -ffree-form -ffree-line-length-none -std=f2008ts -fopenmp -O3
-#OPT = -ffree-form -ffree-line-length-none -std=f2008ts -fopenmp -O3 -fbounds-check
 
-all:ptm
+SRCS := $(wildcard src/*.f90)
+OBJS := $(patsubst %.f90,%.o,$(SRCS))
+PRG_OBJ = $(PROG).o
 
-rksuite.o: rksuite.f90
-	$(F90) $(OPT) -c -o rksuite.o rksuite.f90
+# First target is default on calling `make` w/o args
+all: ptm
 
-global.o: global.f90
-	$(F90) $(OPT) -c -o global.o global.f90
+# Compile all objects
+$(OBJS): %.o : %.f90
+	$(F90) $(OPT) -c -o $@ $<
 
-finite_differences.o: finite_differences.f90
-	$(F90) $(OPT) -c -o finite_differences.o finite_differences.f90
+# Link everything
+$(PROG): $(OBJS)
+	$(F90) $(OPT) -o $@ $^
 
-interpolation.o: interpolation.f90
-	$(F90) $(OPT) -c -o interpolation.o interpolation.f90
-
-fields.o: fields.f90
-	$(F90) $(OPT) -c -o fields.o fields.f90
-
-particles.o: particles.f90
-	$(F90) $(OPT) -c -o particles.o particles.f90
-
-fileio.o: fileio.f90
-	$(F90) $(OPT) -c -o fileio.o fileio.f90
-
-stepper.o: stepper.f90
-	$(F90) $(OPT) -c -o stepper.o stepper.f90
-
-ptm.o: ptm.f90
-	$(F90) $(OPT) -c -o ptm.o ptm.f90
-
-ptm: rksuite.o global.o finite_differences.o interpolation.o fields.o particles.o fileio.o stepper.o ptm.o
-	$(F90) $(OPT) -o ptm rksuite.o global.o finite_differences.o interpolation.o fields.o particles.o fileio.o stepper.o ptm.o
+# Explicitly list dependencies (will control compile/link order)
+src/rksuite.o :
+src/global.o : src/rksuite.o
+src/fields.o : src/global.o src/finite_differences.o src/interpolation.o
+src/fileio.o : src/global.o src/particles.o src/fields.o
+src/finite_differences.o: src/global.o
+src/stepper.o: src/global.o src/particles.o src/fields.o
+src/particles.o: src/global.o src/fields.o src/interpolation.o
+src/ptm.o : src/stepper.o
 
 clean:
-	rm -f *.o
+	rm -f src/*.o
 	rm -f *.mod
+	rm -f ptm
 

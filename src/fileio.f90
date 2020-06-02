@@ -110,9 +110,12 @@ contains
   dataStore(6) = vpara/gam
   dataStore(7) = myParticle%p(2)*(gam-1.d0)
 
+  ! Save pitch angle
   if(vpara==0.0d0) then ! Handle special case to avoid divide-by-zero error
     dataStore(8) = 90.0d0
   else ! Use absolute value because we're only concerned about relative angle here
+    ! TODO: saving PA in [0-90] is good here, as long as we're able to cover the
+    !       full range of PA when generating vpara & vperp
     dataStore(8) = atan(abs(vperp/vpara))/dtor
   endif
 
