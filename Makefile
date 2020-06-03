@@ -8,7 +8,7 @@ OBJS := $(patsubst %.f90,%.o,$(SRCS))
 PRG_OBJ = $(PROG).o
 
 # First target is default on calling `make` w/o args
-all: ptm
+all: ptm python
 
 # Compile all objects
 $(OBJS): %.o : %.f90
@@ -28,8 +28,16 @@ src/stepper.o: src/global.o src/particles.o src/fields.o
 src/particles.o: src/global.o src/fields.o src/interpolation.o
 src/ptm.o : src/stepper.o
 
-clean:
+python:
+	python setup.py install
+
+clean: clean-ptm clean-python
+
+clean-ptm:
 	rm -f src/*.o
 	rm -f *.mod
 	rm -f ptm
 
+clean-python:
+	rm -f ptm_python/*.pyc
+	rm -rf ptm_python/__pycache__
