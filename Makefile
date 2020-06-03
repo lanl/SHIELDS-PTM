@@ -26,7 +26,7 @@ src/fileio.o : src/global.o src/particles.o src/fields.o
 src/finite_differences.o: src/global.o
 src/stepper.o: src/global.o src/particles.o src/fields.o
 src/particles.o: src/global.o src/fields.o src/interpolation.o
-src/ptm.o : src/stepper.o
+src/ptm.o : src/stepper.o src/fileio.o
 
 python:
 	python setup.py install
