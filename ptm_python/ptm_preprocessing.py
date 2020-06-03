@@ -8,9 +8,9 @@ import argparse
 import glob
 import os
 import numpy as np
-# local directory imports
-import ptm_read
-import ptm_interpolate
+# local package imports
+from . import ptm_read
+from . import ptm_interpolate
 
 # Python 2 compatibility for checking string types
 if not hasattr(__builtins__, "basestring"):

@@ -5,10 +5,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 
-# Because ptm_python is currently installed,
-# scripts should set the location so it can be
-# imported
-sys.path.insert(1, os.path.dirname(os.path.abspath('../ptm_python')))
 from ptm_python import ptm_tools
 
 # This section only runs when launched as a command line script

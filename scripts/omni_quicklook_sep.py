@@ -7,10 +7,6 @@ import numpy as np
 import spacepy.toolbox as tb
 import matplotlib.pyplot as plt
 
-# Because ptm_python is currently not an installed/installable,
-# module,  scripts should set the location so it can be
-# imported
-sys.path.insert(1, os.path.dirname(os.path.abspath('../ptm_python')))
 from ptm_python import ptm_tools as ptt
 from ptm_python import ptm_postprocessing as post
 
@@ -134,7 +130,7 @@ def instrFOV(fluxmap):
 
 
 if __name__ == '__main__':
-    fns = glob.glob('/net/toaster/u/smorley/test_PTM/ptm_output/map_00*.dat')
+    fns = glob.glob('/net/toaster/u/smorley/test_PTM/ptm_output/map_000[2-8].dat')
     fluxmap = ptt.parse_map_file(fns)
     fluxmap_1 = copy.deepcopy(fluxmap)
     fluxmap_2 = copy.deepcopy(fluxmap)

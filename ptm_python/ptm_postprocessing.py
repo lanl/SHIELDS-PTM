@@ -4,8 +4,9 @@ import numpy as np
 from scipy import constants
 from scipy import special
 from scipy import linalg
-# local directory import
-import ptm_tools as pt
+# local package import
+from . import ptm_tools as pt
+
 
 class ptm_postprocessor(object):
 
@@ -148,7 +149,7 @@ class ptm_postprocessor(object):
         gamterm = special.gamma(self.__kappa+1)/special.gamma(self.__kappa-0.5)
         enterm = 1+(energy/e_kap)**expo
         distfn = self.__n*massterm*gamterm*enterm
-        # Convert distribution function `to flux
+        # Convert distribution function to flux
         flux = 1e5*p_squared
         return flux
 

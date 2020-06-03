@@ -133,7 +133,7 @@ def parse_map_file(fnames):
         lines = np.loadtxt(fh)
     for fname in fnames[1:]:
         dum = np.loadtxt(fname, skiprows=1)
-        lines = np.vstack((res, dum))
+        lines = np.vstack((lines, dum))
 
     pavec = np.sort(np.unique(lines[:, 5]))
     envec = np.sort(np.unique(lines[:, 4]))
