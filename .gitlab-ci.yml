@@ -1,8 +1,7 @@
 test:default:
   image: drsteve1663/lanlptm:1.0
-  before_script:
+  script:
     - shopt -s expand_aliases
     - alias python='python3'
-  script:
     - make 
     - ./ptm 1
