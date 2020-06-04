@@ -1,4 +1,4 @@
-PYEXE = python
+PYEXE = `which python3`
 PROG = ptm
 F90 = gfortran
 OPT = -ffree-form -ffree-line-length-none -std=f2008ts -fopenmp -O3
