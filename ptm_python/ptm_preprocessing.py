@@ -9,8 +9,14 @@ import glob
 import os
 import numpy as np
 # local package imports
-from . import ptm_read
-from . import ptm_interpolate
+try:
+    from . import ptm_read
+    from . import ptm_interpolate
+except ImportError:
+    # if running as a script in source directory
+    # relative import won't work
+    import ptm_read
+    import ptm_interpolate
 
 # Python 2 compatibility for checking string types
 if not hasattr(__builtins__, "basestring"):
