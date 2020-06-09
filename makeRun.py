@@ -30,22 +30,41 @@ def setupGPS(opt, runid, nruns, verbose=False):
     ys = np.fromfile(os.path.join(indir, 'ygrid.bin'))
     zs = np.fromfile(os.path.join(indir, 'zgrid.bin'))
 
-    # break energy space over number of runs...
+    # break energy & alpha space over number of runs...
     emin = 5.0*1e3  # 5MeV lower limit
-    emax = 200.0*1e3  # 100MeV upper limit
-    nenergy = 200
-    energy_arr = np.linspace(emin, emax, nenergy)
+    emax = 800.0*1e3  # 800MeV upper limit
+    nenergy = 300
+    pamin = 0.1
+    pamin_r = np.deg2rad(pamin)
+    pamax = 179.9
+    pamax_r = np.deg2rad(pamax)
+    nalpha = 66
+    energy_arr = np.logspace(np.log10(emin), np.log10(emax), num=nenergy)
     per_run = nenergy//nruns
+    # pitch angles evenly spaced around unit sphere in velocity space
+    alpha_arr = np.rad2deg(np.arccos(np.linspace(np.cos(pamin_r),
+                                                 np.cos(pamax_r),
+                                                 num=nalpha)))
+    per_run_alpha = nalpha//nruns
+    # now reorder energy and pitch angle arrays randomly
+    np.random.shuffle(energy_arr)
+    np.random.shuffle(alpha_arr)
 
     for runno in range(nruns):
         imin = per_run*runno
+        imin_a = per_run_alpha*runno
         imax = per_run*(runno+1)  # exclusive for use in ranges
-        earr = {'min': energy_arr[imin],
-                'max': energy_arr[imax-1],
-                'n_e': per_run if runno != nruns-1 else len(energy_arr[imin:])
+        imax_a = per_run_alpha*(runno+1)
+        earr = {'n_e': per_run if runno != nruns-1 else len(energy_arr[imin:]),
+                'n_a': per_run_alpha if runno != nruns-1 else len(alpha_arr[imin_a:]),
                 }
-        # TODO: presumably will need to do multiple run definitions here...
-        #       then map them all to a GNU parallel launcher
+        # build energy and pitch angle arrays and write to file
+        runenergies = np.array(energy_arr[imin:imax])
+        runalphas = np.array(alpha_arr[imin_a:imax_a])
+        runenergies.tofile(os.path.join(indir, 'energies_{:04d}.bin'.format(runid+runno)))
+        runalphas.tofile(os.path.join(indir, 'pitchangles_{:04d}.bin'.format(runid+runno)))
+
+        # start input file setup
         setup = ptm_input.ptm_input_creator(runid=runid+runno,
                                             idensity=1,  # Point source
                                             )
@@ -56,20 +75,14 @@ def setupGPS(opt, runid, nruns, verbose=False):
                              ny=ys.shape[0],
                              nz=zs.shape[0])
 
-        # Change to flux map mode
-        setup.set_parameters(idist=3)  # TODO: can I get particle 
-                                       # trajectories in the usual
-                                       # format with this mode?
-        # How do I combine multiple "runs"? For efficiency I should
+        # Change to user-defined flux map mode
+        setup.set_parameters(idist=4)
+        # Break up into multiple "runs"? For efficiency I should
         # parcel the runs up, probably using smaller ranges in
         # energy...
-        setup.set_parameters(emin=earr['min'],  # Emin in keV
-                             emax=earr['max'],  # Emax in keV
-                             phi=-1.0,  # negative phi is randomly-seeded
+        setup.set_parameters(phi=-1.0,  # negative phi is randomly-seeded
                              nenergy=earr['n_e'],  # number of energies
-                             npitch=18,  # number of pitch angles
-                             pamin=0,
-                             pamax=180,
+                             npitch=earr['n_a'],  # number of pitch angles
                              xsource=-20.0
                              )
 
@@ -78,7 +91,8 @@ def setupGPS(opt, runid, nruns, verbose=False):
                              itrace=-1,  # backwards in time
                              charge=1.0, mass=1837.0,  # protons
                              dtout=0.1, # 0.1s output written
-                             thi=300.0, # max time of 300s
+                             thi=opt.starttime, # max time ("start" for backwards trace)
+                             tlo=opt.starttime-300,  # min time ("end" for backwards trace)
                              itraj=1,  # 1=write trajectories when in fluxmap mode
                              )
 
@@ -222,7 +236,7 @@ def writeJobScript(options, nRuns, cluster=False, c_kwargs={}):
     else:
         with open('job_script.sh', 'w') as fh:
             fh.write('#!/usr/bin/env bash\n')
-            cmds = ['./ptm {0}'.format(nn) for nn in range(runst, runen+1)]
+            cmds = ['./ptm {0}'.format(nn) for nn in range(runst, runen)]
             cmdstr = ' && '.join(cmds)
             fh.write(cmdstr + '\n')
         print('Run jobs using `source job_script.sh` from the run directory')
@@ -252,6 +266,9 @@ if __name__ == '__main__':
                         type=float)
     parser.add_argument('-e', '--elec', dest='elec', action='store_true')
     parser.add_argument('-c', '--cluster', dest='cluster', action='store_true')
+    parser.add_argument('-s', '--starttime', dest='starttime', type=float, default=300,
+                        help='Start time for trajectory integration in integer seconds ' +
+                        'since the start time of the fields input.')
 
     opt = parser.parse_args()
 
@@ -290,7 +307,7 @@ if __name__ == '__main__':
         nRuns = 1
         setupElec(opt, opt.runid, nRuns)
     else:
-        nRuns = 4
+        nRuns = 8
         setupGPS(opt, opt.runid, nRuns)
 
     # write job sscript: local run option as well as HPC run option
