@@ -66,6 +66,7 @@ if __name__ == '__main__':
     parser.add_argument('-t', '--time', dest='time', type=int, nargs='+',
                         help='Date time as whitespace-delimited list,'
                         + ' e.g., "-t 2017 9 3 13 15"')
+    parser.add_argument('-l', dest='add_l', action='store_true')
     # To use the script directly with makeRun.py
     # Ensure that Spacepy is not returning the support notice
     # the call makeRun like:
@@ -83,5 +84,5 @@ if __name__ == '__main__':
         for sat in sats:
             getPosition(sat, targ_time, verbose=True)
     else:
-        posargs = getPosition('ns{}'.format(opt.sat), targ_time)
-        print(posargs)
+        posargs = getPosition('ns{}'.format(opt.sat), targ_time, verbose=opt.add_l)
+        if not opt.add_l: print(posargs)

@@ -2,6 +2,7 @@ import sys
 import os
 import glob
 import copy
+import argparse
 import itertools as it
 import numpy as np
 import spacepy.toolbox as tb
@@ -130,7 +131,12 @@ def instrFOV(fluxmap):
 
 
 if __name__ == '__main__':
-    fns = glob.glob('/net/toaster/u/smorley/test_PTM/ptm_output/map_000[2-8].dat')
+    # Set up a basic argument parser
+    parser = argparse.ArgumentParser()
+    parser.add_argument('dir')
+    opt = parser.parse_args()
+
+    fns = glob.glob(os.path.join(opt.dir, 'map_*.dat'))
     fluxmap = ptt.parse_map_file(fns)
     fluxmap_1 = copy.deepcopy(fluxmap)
     fluxmap_2 = copy.deepcopy(fluxmap)
