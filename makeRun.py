@@ -35,30 +35,36 @@ def setupGPS(opt, runid, nruns, verbose=False):
     emax = 800.0*1e3  # 800MeV upper limit
     nenergy = 300
     pamin = 0.1
-    pamin_r = np.deg2rad(pamin)
     pamax = 179.9
-    pamax_r = np.deg2rad(pamax)
-    nalpha = 66
+    nalpha = 67
     energy_arr = np.logspace(np.log10(emin), np.log10(emax), num=nenergy)
     per_run = nenergy//nruns
-    # pitch angles evenly spaced around unit sphere in velocity space
-    alpha_arr = np.rad2deg(np.arccos(np.linspace(np.cos(pamin_r),
-                                                 np.cos(pamax_r),
-                                                 num=nalpha)))
-    per_run_alpha = nalpha//nruns
-    # now reorder energy and pitch angle arrays randomly
+    # pitch angles evenly spaced around unit sphere
+    # TODO: with one phase angle per (E,a) pair, coverage is relatively sparse
+    #       perp. to the magnetic field. Can correct with, e.g., cosine scaling
+    #       of alpha, but could switch to a method for evenly distributing points
+    #       on the sphere (e.g., https://gist.github.com/dinob0t/9597525)
+    #       This would then necessitate a different way of postprocessing the
+    #       fluxmap
+    alpha_arr = np.linspace(pamin, pamax, num=nalpha)
+    # now reorder energy arrays randomly
     np.random.shuffle(energy_arr)
-    np.random.shuffle(alpha_arr)
 
     for runno in range(nruns):
+        # for each run, use a subset of the energies
         imin = per_run*runno
-        imin_a = per_run_alpha*runno
         imax = per_run*(runno+1)  # exclusive for use in ranges
-        imax_a = per_run_alpha*(runno+1)
+        imin_a = 0  # will need to change for splits across alpha
+        imax_a = nalpha
         earr = {'n_e': per_run if runno != nruns-1 else len(energy_arr[imin:]),
-                'n_a': per_run_alpha if runno != nruns-1 else len(alpha_arr[imin_a:]),
+                'n_a': nalpha,
                 }
         # build energy and pitch angle arrays and write to file
+        # TODO: to use different pitch angles the different alpha sets
+        #       would need to be paired with copies of the energy sets
+        #       E.g. Energies are [1, 3, 5] and [2, 4]
+        #            alphas are [0, 45, 90] and [22.5, 67.5]
+        #       So E=[1, 3, 5] would need to be run with both a=[0, 45, 90] and a=[22.5, 67.5]
         runenergies = np.array(energy_arr[imin:imax])
         runalphas = np.array(alpha_arr[imin_a:imax_a])
         runenergies.tofile(os.path.join(indir, 'energies_{:04d}.bin'.format(runid+runno)))
@@ -307,7 +313,7 @@ if __name__ == '__main__':
         nRuns = 1
         setupElec(opt, opt.runid, nRuns)
     else:
-        nRuns = 8
+        nRuns = 10
         setupGPS(opt, opt.runid, nRuns)
 
     # write job sscript: local run option as well as HPC run option

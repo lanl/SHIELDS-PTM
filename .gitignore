@@ -2,4 +2,7 @@ ptm
 *.mod
 *.o
 *.pyc
+*egg-info
+build
+dist
 ptm_output/*.dat
