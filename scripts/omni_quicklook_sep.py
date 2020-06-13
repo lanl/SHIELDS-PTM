@@ -79,11 +79,20 @@ def cutoffs(fluxmap, addTo=None, **kwargs):
 
     en_mev = fluxmap['energies']/1e3
     cdict = dict()
+    # Earth (1.1Re to include atmosphere) subtends ~0.225 ster
+    # (solid angle = 2*pi*(1-cos(theta)), where theta is angle of inverse
+    # position vector to limb of Earth)
+    # 0.225 ster/4*pi = 0.179
     not_forbidden = np.nonzero(allow)[0]
+    full_access = allow>0.82  # 1-0.18 = 0.82
     idx_low = not_forbidden[0]
     ec_low = en_mev[idx_low]
-    idx_high = not_forbidden[-1]
+    print('Ec_low = {}'.format(ec_low))
+    # upper cutoff is where all values are "full" transmission
+    # Here "full" accounts for solid angle of Earth
+    idx_high = find_runs(full_access)[-1][0]
     ec_high = en_mev[idx_high]
+    print('Ec_high = {}'.format(ec_high))
     prot_low = ptt.Proton(ec_low)
     prot_high = ptt.Proton(ec_high)
     
@@ -112,20 +121,31 @@ def cutoffs(fluxmap, addTo=None, **kwargs):
     return cdict, allow
 
 
+def find_runs(invec, value=True):
+    """Find starts of contiguous blocks"""
+    isvalue = np.concatenate(([0], np.equal(invec, value).view(np.int8), [0]))
+    absdiff = np.abs(np.diff(isvalue))
+    # runs start and end where absdiff is 1
+    ranges = np.where(absdiff == 1)[0].reshape(-1, 2)
+    return ranges
+
+
 def add_extra_omni(ax, omni, fluxmap, **kwargs):
     ax.loglog(fluxmap['energies']/1e3, omni*1e3, **kwargs)
 
 
 def instrFOV(fluxmap):
-    # get the nadir-pointing unit vector
-    nadir = -1*fluxmap.attrs['position']
-    nadir = nadir/np.linalg.norm(nadir)
-    # get angle between nadir vector and initial particle velocity
+    # get the instrument field-of-view axis
+    # CXD is nadir pointing, so FOW axis is inverse of position vector
+    fovaxis = -1*fluxmap.attrs['position']
+    fovaxis = fovaxis/np.linalg.norm(fovaxis)
+    # get angle between inverse of FOV axis and initial particle velocity
+    # (because velocity needs to point in to the detector aperture)
     fiv = fluxmap['init_v']
     angles = np.zeros((fiv.shape[0], fiv.shape[1]))
     for idx in range(fiv.shape[0]):
         for jdx in range(fiv.shape[1]):
-            angles[idx, jdx] = np.rad2deg(np.arccos(np.dot(nadir, fluxmap['init_v'][idx, jdx]
+            angles[idx, jdx] = np.rad2deg(np.arccos(np.dot(-1*fovaxis, fluxmap['init_v'][idx, jdx]
                                                            /np.linalg.norm(fluxmap['init_v'][idx, jdx]))))
     return angles
 
