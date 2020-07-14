@@ -7,7 +7,13 @@ from scipy import linalg
 from scipy import integrate
 from scipy import interpolate
 # local package import
-from . import ptm_tools as pt
+# local package imports
+try:
+    from . import ptm_tools as pt
+except ImportError:
+    # if running as a script in source directory
+    # relative import won't work
+    import ptm_tools as pt
 
 
 class ptm_postprocessor(object):
