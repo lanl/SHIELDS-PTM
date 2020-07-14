@@ -4,6 +4,8 @@ import numpy as np
 from scipy import constants
 from scipy import special
 from scipy import linalg
+from scipy import integrate
+from scipy import interpolate
 # local package import
 from . import ptm_tools as pt
 
@@ -12,187 +14,312 @@ class ptm_postprocessor(object):
 
     __ckm = constants.speed_of_light/1e3
     __csq = (constants.speed_of_light/1e3)**2
-    __elec_restmass = 5.11e2
+    __elec_restmass = 511.0
+    __ccm = constants.speed_of_light*1e2
 
-    """
-    -------
-    Purpose
-    -------
+    __supported_distributions = ('kappa','kaprel','maxwell','juttner')
 
-    The ptm_postprocessor is an object designed to streamline the analysis of ptm data,
-    particularly when coupled with the new rungrid capability of the ptm_input module.
+    # Default parameters for available distribution types, assumes electron species
+    __params_kappa = {'density':1.0e-1,'energy':5,'mass':1.0,'kappa':2.5}
+    __params_kaprel = {'density':1.0e-2,'energy':100.0,'mass':1.0,'kappa':5.0}
+    __params_maxwell = {'density':1.0e-1,'energy':10,'mass':1.0}
+    __params_juttner = {'density':4.73e-3,'energy':160.0,'mass':1.0}
 
-    ------
-    Inputs
-    ------
+    def __init__(self,source_type='kappa',params={},filedir=None):
 
-    filedir     string      optional, specifies directory where data files are found
-
-    -------
-    Outputs
-    -------
-
-    See documentation for individual routines
-    """
-
-    def __init__(self,filedir=None):
         if filedir is not None:
             self.__filedir = os.path.expanduser(filedir)
         else:
             self.__filedir = os.getcwd()
 
-        self.__set_defaults = True
+        # Initialize postprocessor. Default is kappa distribution but this can
+        # be changed using the constructor call or with an explicit call to the
+        # configure_source method after the postprocessor is initialized
 
-    def set_source_parameters(self, n_dens=1.0, e_char=0.5, kappa=2.5, mass=1.0):
-        """
-        -------
-        Purpose
-        -------
+        self.set_source(source_type,params)
 
-        Set the parameters of a single-component kappa distribution
+        return
 
-        ------
-        Inputs
-        ------
+    def set_source(self,source_type='kappa',params={}):
 
-        n_dens      float       optional, number density at source region in cm-3
-        e_char      float       optional, characteristic energy of distribution in keV
-        kappa       float       optional, spectral index of kappa distribution
-        mass        float       optional, particle mass in multiples of electron mass
+        if source_type not in self.__supported_distributions:
+            raise ValueError('Specified source type ({:}) not supported'.format(source_type))
+        elif source_type == 'kappa':
+            self.__use_kappa(params)
+            self.get_flux = self.__flux_kappa
+            self.get_dist = self.__dist_kappa
+            self.get_dist_u = self.__dist_kappa_u
+        elif source_type == 'kaprel':
+            self.__use_kaprel(params)
+            self.get_flux = self.__flux_kaprel
+            self.get_dist = self.__dist_kaprel
+            self.get_dist_u = self.__dist_kaprel_u
+        elif source_type == 'maxwell':
+            self.__use_maxwell(params)
+            self.get_flux = self.__flux_maxwell
+            self.get_dist = self.__dist_maxwell
+            self.get_dist_u = self.__dist_maxwell_u
+        elif source_type == 'juttner':
+            self.__use_juttner(params)
+            self.get_flux = self.__flux_juttner
+            self.get_dist = self.__dist_juttner
+            self.get_dist_u = self.__dist_juttner_u
 
-        -------
-        Outputs
-        -------
+        self.source_type = source_type
 
-        None
+        return
 
-        """
-        self.__mc2 = self.__elec_restmass*mass
-        self.__ec = e_char
-        self.__n = n_dens
-        self.__kappa = kappa
+    def __use_kappa(self,params={}):
+        # Set parameters of the postprocessor for non-relativistic kappa option
+        # Get the parameters by merging user specifications with defaults
+        my_params = {**self.__params_kappa,**params}
 
-        self.__set_defaults = False
+        if my_params['kappa'] <= 1.5:
+            raise ValueError('__use_kappa: kappa < 1.5 ({:}) is not valid'.format(my_params['kappa']))
 
-    def calculate_flux(self,fluxmap, kind='kappa'):
-        """
-        -------
-        Purpose
-        -------
+        self.__kappa = my_params['kappa']
+        self.__n = my_params['density']
+        self.__ec = my_params['energy']
+        self.__mc2 = my_params['mass']*self.__elec_restmass
+        self.__wc = self.__ckm*np.sqrt((2*self.__kappa-3)*self.__ec/(self.__kappa*self.__mc2))
+        self.__fcoef = self.__n*self.__wc*(self.__ccm/self.__ckm)*np.sqrt(4*np.pi)/(self.__ec*self.__kappa*special.beta(self.__kappa-1/2,3/2))
+        self.__dcoef = self.__n/(2*np.pi*(self.__kappa*self.__wc**2)**(3/2)*special.beta(self.__kappa-1/2,3/2))
 
-        Calculate differential particle fluxes from a PTM fluxmap
+        return
 
-        ------
-        Inputs
-        ------
+    def __use_kaprel(self,params={}):
+        # Set parameters of the postprocessor for relativistic kappa option
+        # Get the parameters by merging user specifications with defaults
+        my_params = {**self.__params_kappa,**params}
 
-        fluxmap     dictionary      Fluxmap dictionary generated by ptm_tools.parse_map_file
+        if my_params['kappa'] <= 1.5:
+            raise ValueError('__use_kaprel: kappa < 1.5 ({:}) is not valid'.format(my_params['kappa']))
 
-        -------
-        Outputs
-        -------
+        self.__kappa = my_params['kappa']
+        self.__n = my_params['density']
+        self.__ec = my_params['energy']
+        self.__mc2 = my_params['mass']*self.__elec_restmass
+        self.__energy_ratio = self.__mc2/self.__ec
 
-        j           array(float)    Differential flux
+        a = 4*np.pi
+        b = 8*special.beta(3/2,self.__kappa-2)/(2*self.__kappa-1)
+        x = 1-2*self.__energy_ratio/self.__kappa
+        c = special.hyp2f1(self.__kappa+1,5/2,self.__kappa+1/2,x)*3
+        d = special.hyp2f1(self.__kappa+1,3/2,self.__kappa+1/2,x)*(self.__kappa-2)
 
-        --------
-        See Also
-        --------
-        calculate_flux (method) in ptm_postprocessing
-        """
+        self.__fcoef = self.__n*self.__ccm/(self.__ec*a*b*(c+d))
+        self.__dcoef = self.__n/(a*b*(c+d)*self.__ckm**3)
 
-        if self.__set_defaults:
-            self.set_source_parameters()
+        return
 
-        ef = fluxmap['final_E']
-        ei = fluxmap['init_E']
+    def __use_maxwell(self,params={}):
+        # Set parameters of the postprocessor for non-relativistic Maxwellian option
+        # Get the parameters by merging user specifications with defaults
+        my_params = {**self.__params_juttner,**params}
 
-        gami = 1 + ei/self.__mc2
-        gamf = 1 + ef/self.__mc2
+        self.__n = my_params['density']
+        self.__mc2 = my_params['mass']*self.__elec_restmass
+        self.__ec = my_params['energy']
+        self.__energy_ratio = self.__mc2/self.__ec
+        self.__dcoef = self.__n*(self.__energy_ratio/(2*np.pi*self.__ckm**2))**(3/2)
+        self.__fcoef = self.__n*self.__ccm*(self.__energy_ratio/(2*np.pi))**(3/2)/self.__mc2
 
-        # velocity corresponding to final energy
-        v = self.__ckm*np.sqrt(gamf*gamf-1.0)/gamf
 
-        if kind.lower() == 'maxwell':
-            # Maxwell-Juttner distribution
-            # TODO: verify and determine why the Bessel fn returns 0 at standard values
-            Q = self.__ec/self.__mc2
-            f0 = self.__n/(4*np.pi*self.__ckm**3*Q*special.kn(2, 1.0/Q))
-            f = f0*np.exp(-gami/Q)
-        elif kind.lower() == 'kappa':
-            # Kappa distribution
-            Wc = self.__ec*(1.0-1.5/self.__kappa)
-            f0 = self.__n*(self.__mc2/(self.__csq*Wc*2*np.pi*self.__kappa))**1.5\
-                *(special.gamma(self.__kappa+1)/special.gamma(self.__kappa-0.5))
-            f = f0*(1+ei/(self.__kappa*Wc))**-(self.__kappa+1)
-        else:
-            raise ValueError('calculate_flux: kind={0} is not supported'.format(kind))
+    def __use_juttner(self,params={}):
+        # Set parameters of the postprocessor for Maxwell-Juttner option
+        # Get the parameters by merging user specifications with defaults
+        my_params = {**self.__params_juttner,**params}
 
-        # map to final energy and convert to diff. flux.
-        j = f*1e5*self.__csq*v*v/self.__mc2
+        self.__n = my_params['density']
+        self.__mc2 = my_params['mass']*self.__elec_restmass
+        self.__ec = my_params['energy']
+        self.__energy_ratio = self.__mc2/self.__ec
+        self.__dcoef = self.__n*self.__energy_ratio/(4*np.pi*self.__ckm**3*special.kve(2,self.__energy_ratio))
+        self.__fcoef = self.__n*self.__ccm*self.__energy_ratio/(4*np.pi*self.__mc2*special.kve(2,self.__energy_ratio))
+
+
+    def __dist_kappa(self,energy):
+        # Kappa distribution function that takes energy as input
+        v = np.sqrt(2*energy/self.__mc2)
+        fun = 1/(1+(v/(self.__wc/self.__ckm))**2/self.__kappa)**(self.__kappa+1)
+        f = self.__dcoef*fun
+
+
+    def __dist_kappa_u(self,v):
+        # Kappa distribution function that takes velocity as an input
+        # v=p/mc is the normalized momentum, presumed non-relativistic
+        fun = 1/(1+(v/(self.__wc/self.__ckm))**2/self.__kappa)**(self.__kappa+1)
+        f = self.__dcoef*fun
+
+        return f
+
+
+    def __dist_kaprel(self,energy):
+        # Relativistic kappa distribution that takes energy as an input
+        gam = 1+energy/self.__mc2
+        fun = 1/(1+(gam-1)*self.__energy_ratio/self.__kappa)**(self.__kappa+1)
+        f=self.__dcoef*fun
+
+        return f
+
+
+    def __dist_kaprel_u(self,u):
+        # Relativistic kappa distribution that takes momentum as an input
+        # u=p/mc is the normalized momentum
+        gam = np.sqrt(1+u**2)
+        fun = 1/(1+(gam-1)*self.__energy_ratio/self.__kappa)**(self.__kappa+1)
+        f = self.__dcoef*fun
+
+        return f
+
+
+    def __dist_maxwell(self,energy):
+        # Non-relativistic Maxwellian distribution
+        beta2 = 2*energy/self.__mc2
+        fun = np.exp(-self.__energy_ratio*beta2/2)
+        f = self.__dcoef*fun
+
+        return f
+
+
+    def __dist_maxwell_u(self,u):
+        # Non-relativistic Maxwellian distribution that takes momentum as an input
+        # u = p/mc = v/c in non-relativistic limit
+        beta2 = u*u
+        fun = np.exp(-self.__energy_ratio*beta2/2)
+        f = self.__dcoef*fun
+
+        return f
+
+
+    def __dist_juttner(self,energy):
+        # Maxwell-Juttner distribution that takes energy as an input
+        gam = 1+energy/self.__mc2
+        fun = np.exp(-(gam-1)*self.__energy_ratio)
+        f = self.__dcoef*fun
+
+        return f
+
+
+    def __dist_juttner_u(self,u):
+        # Maxwell-Juttner distribution that takes momentum as an input
+        # u=p/mc is the normalized momentum
+        gam=np.sqrt(1+u**2)
+        fun=np.exp(-self.__energy_ratio*(gam-1))
+        f = self.__dcoef*fun
+
+        return f
+
+
+    def __flux_kappa(self,energy):
+        # Based on equation 10a of Vasyliunas [1962]. The coefficient is caluclated in
+        # the __use_kappa method
+        x = energy/self.__ec
+        fun = x/(1+x/self.__kappa)**(self.__kappa+1)
+
+        j = self.__fcoef*fun
 
         return j
 
 
-    def _kappa(self, energy):
-        """Kappa function - non-relativistic
-        eqn 10 of Woodroffe et al., 2018
+    def __flux_kaprel(self,energy):
+        # Based on Equations 4-5 of Xiao, Zhou, Li, and Cai [2008]. The coefficent
+        # is calculated in the __use_kaprel method
+        gamma=1+energy/self.__mc2
+        fun = (gamma*gamma-1)/(1+(gamma-1)*self.__energy_ratio/self.__kappa)**(self.__kappa+1)
+        j = self.__fcoef*fun
+
+        return j
+
+
+    def __flux_maxwell(self,energy):
+        # Standard Maxwell-Boltzmann distribution
+        beta2 = 2*energy/self.__mc2
+        fun = beta2*np.exp(-self.__energy_ratio*beta2/2)
+
+        j = self.__fcoef*fun
+
+        return j
+
+
+    def __flux_juttner(self,energy):
+        # Based on Equation 14 of Morley, Sullivan, Schirato, and Terry [2014]. The coefficent
+        # is calculated in the __use_juttner method
+        gamma = 1+energy/self.__mc2
+        fun = (gamma*gamma-1)*np.exp(-(gamma-1)*self.__energy_ratio)
+
+        j = self.__fcoef*fun
+
+        return j
+
+
+    def map_flux(self, fluxmap):
         """
-        # General quantities
-        rel_gamma = 1 + energy/self.__mc2
-        mass = self.__mc2/self.__elec_restmass
-        vel = self.__ckm*np.sqrt(rel_gamma*rel_gamma - 1)/rel_gamma
-        p_squared = self.csq*vel*vel
-        # Kappa specific stuff
-        expo = -(self.__kappa+1)
-        e_kap = self.__ec*(self.__kappa - 3/2)
-        massterm = (mass/(2*np.pi*e_kap))**1.5
-        gamterm = special.gamma(self.__kappa+1)/special.gamma(self.__kappa-0.5)
-        enterm = 1+(energy/e_kap)**expo
-        distfn = self.__n*massterm*gamterm*enterm
-        # Convert distribution function to flux
-        flux = 1e5*p_squared
-        return flux
-
-
-    def calculate_omnidirectional_flux(self, pav,flux):
+        Map fluxes from source region to observation point using Liouville's theorem
         """
-        -------
-        Purpose
-        -------
+        # Energies
+        ei = fluxmap['init_E']
+        ef = fluxmap['final_E']
 
-        Calculate the omnidirectional flux from the differential flux
+        # Calculate the flux at the source
+        ji = self.get_flux(ei)
 
-        ------
-        Inputs
-        ------
+        # Relativistic gammas
+        gami = 1 + ei/self.__mc2
+        gamf = 1 + ef/self.__mc2
 
-        pav         array(float)    Array of pitch angle bins, not necessarily evenly-spaced
-        flux        array(float)    Array of fluxes generated by calculate_flux
+        # Mapped the flux to the observation point, the prefactor is ratio of squared momenta
+        jf = ((gamf*gamf-1)/(gami*gami-1))*ji
 
-        -------
-        Outputs
-        -------
+        return jf
 
-        omni        array(float)    Omnidirectional fluxes
 
+    def get_omni_flux(self,pa,flux,method='spline'):
         """
+        This features two methods for omnidirectional flux calculations. The default is to fit B-splines to the
+        fluxes and then integrate the spline functions. Alternatively, by passing "method = bin", a trapezoidal
+        integration scheme can be used.
+        """
+        fshape = np.shape(flux)
+        npa = np.size(pa)
 
-        Q = np.deg2rad(pav)
-        coef = 4.0*np.pi*np.diff(Q)
-        favg = 0.5*(flux[:,1:]+flux[:,:-1])
-        savg = np.sin(0.5*(Q[1:]+Q[:-1]))
+        # Infer if the pitch angles are radians or degrees
+        if np.max(np.abs(pa)) > np.pi:
+            mya = np.radians(pa)
+        else:
+            mya = pa
 
-        # This reduction approximates the weighted integral over pitch angles
-        omni=np.einsum("i,ji",coef*savg,favg)
+        # Determine which dimension corresponds to pitch angles
+        if fshape[1]==npa:
+            myflux = flux
+        elif fshape[0]==npa:
+            myflux = np.transpose(flux)
+        else:
+            raise ValueError("Dimension mismatch in get_omni_flux")
+
+        if method == 'spline':
+            # Calculate the omnidiretional flux using B-spline integration, with 2*pi accounting for gyrophase
+            sina = np.sin(mya)
+            omni = 2*np.pi*np.array([interpolate.BSpline(*(interpolate.splrep(mya,f*sina))).integrate(np.min(mya),np.max(mya)) for f in myflux])
+        else:
+            coef = 2*np.pi*(mya[1:]-mya[:-1])
+            favg = 0.5*(myflux[:,1:]+myflux[:,:-1])
+            savg = np.sin(0.5*(mya[1:]+mya[:-1]))
+
+            # This reduction approximates the weighted integral over pitch angles
+            omni=np.einsum("i,ji",coef*savg,favg)
 
         return omni
+
 
     def process_run(self, runid, verbose=True):
         """
         Read in the results of a PTM simulation and calculate the fluxes
 
-        Parameters
-        ----------
+        -------
+        Inputs
+        -------
+
         runid : integer, list, or None
             Integer - identification tag for run to be analyzed (e.g. 1 for data in map_0001.dat)
             List - List of integer ID tags for runs to be combined and analyzed
@@ -226,16 +353,16 @@ class ptm_postprocessor(object):
                 # fall back to single integer provided
                 fname = self.__filedir+'/map_{:04}.dat'.format(runid)
 
-        fluxmap = pt.parse_map_file(fname)
+        fluxmap = parse_map_file(fname)
 
-        flux = self.calculate_flux(fluxmap)
-        omni = self.calculate_omnidirectional_flux(fluxmap['angles'],flux)
+        flux = self.map_flux(fluxmap)
+        omni = self.get_omni_flux(fluxmap['angles'],flux)
 
         results['position'] = fluxmap['final_x']
-        #results['fluxmap']=fluxmap
-        results['initial_E']=fluxmap['init_E'] 
-        results['final_E']=fluxmap['final_E'] 
-        results['energies'] = fluxmap['energies'] 
+        # results['fluxmap'] = fluxmap
+        results['initial_E'] = fluxmap['init_E']
+        results['final_E'] = fluxmap['final_E']
+        results['energies'] = fluxmap['energies']
         results['angles'] = fluxmap['angles']
         results['flux'] = flux
         results['omni'] = omni
@@ -251,125 +378,324 @@ class ptm_postprocessor(object):
             print("Diff Flux [E[PA]]: ", flux)
             print("Omni Flux [E]: ", omni)
 
-        return results  
+        return results
 
-    def seconds_to_hhmmss(self,tsec):
-        """
-        -------
-        Purpose
-        -------
 
-        Convert time in seconds [0,86400) to hours/minutes/seconds
+    def test_distributions(self):
+        # Check valididty of distribution functions.
+        # First, check that velocity/momentum and energy representations give the same answer.
+        # Second, confirm that distribution functions are properly normalized. Each gets multiplied by 4 pi c^3 / n. Note that we are
+        # using the versions that take normalized momentum as the argument rather than energy b/c this simplifies the
+        # mathematics. The other versions yield the same results when momentum is converted to kinetic energy
 
-        ------
-        Inputs
-        ------
+        # Store current parameters
+        params = {'energy':self.__ec,'density':self.__n,'mass':self.__mc2/self.__elec_restmass,'source':self.source_type}
 
-        tsec        float       Time in seconds [0,86400)
+        # Check if we're currently in the kappa family, and if so remember to store kappa as well
+        if hasattr(self,'_ptm_postprocessor__kappa'):
+            params['kappa'] = self.__kappa
 
-        -------
-        Outputs
-        -------
+        c3 = self.__ckm**3
 
-        hh          float       Hours since tsec = 0 (even if 0 is not in tsec)
-        mm          float       Minutes of the hour [0,60)
-        ss          float       Seconds of the minute [0,60)
-        """
+        # Maxwell distribution
+        # Integrate to show proper normalization
+        self.set_source('maxwell')
+        res0=integrate.quad(lambda x:4*np.pi*c3*x*x*self.__dist_maxwell_u(x),0,np.inf)[0]/self.__n
 
-        hh = tsec//3600
-        mm = (tsec-3600*hh)//60
-        ss = tsec-3600*hh-60*mm
+        # Show equivalence between distributions
+        test_speed=0.1 #Normalized momentum p/mc
+        energy = (1/2)*self.__mc2*(test_speed**2)
+        m1,m2 = self.get_dist_u(test_speed), self.get_dist(energy)
 
-        return int(hh), int(mm), int(ss)
+        #Maxwell-Juttner distribution
+        # Integrate to show proper normalization
+        self.set_source('juttner')
+        res1=integrate.quad(lambda x:4*np.pi*c3*x*x*self.__dist_juttner_u(x),0,np.inf)[0]/self.__n
 
-    #------Here we define RAM-specific routines----->
+        # Show equivalence between distributions
+        test_momentum=0.1 #Normalized momentum p/mc
+        gamma=np.sqrt(1+test_momentum**2)
+        energy=(gamma-1)*self.__mc2 # E = (gamma-1)*mc^2
+        j1,j2 = self.get_dist_u(test_momentum), self.get_dist(energy)
 
-    def process_ram_boundary(self,griddir=None,write_files=True,outdir=None,date={'year':2000,'month':1,'day':1}):
-        """
-        Rungrids are a new configuration option provided in the updated version of ptm_input. 
-        In addition to the input files, there is a rungrid.txt file that
-        describes the characteristics of each input file (time and location).
+        # Integrate Kappa distribution
+        self.set_source('kappa')
+        res2=integrate.quad(lambda x:4*np.pi*c3*x*x*self.__dist_kappa_u(x),0,np.inf)[0]/self.__n
 
-        When the RAM boundary is simulated using PTM via rungrid configuration, we are able to
-        simplify the post-processing workflow using this routine.
-        """
+        # Show equivalence between distributions using energy and velocity inputs
+        test_speed=0.1 #Fraction of light speed
+        energy=(1/2)*self.__mc2*test_speed**2 # E = (1/2)(mc^2)*(v/c)**2
+        k1,k2 = self.get_dist_u(test_speed),self.get_dist(energy)
 
-        if griddir==None:
-            mydir = self.__filedir
-        else:
-            mydir = griddir
+        # Integrate relativistic Kappa distribution
+        self.set_source('kaprel')
+        res3=integrate.quad(lambda x:4*np.pi*c3*x*x*self.__dist_kaprel_u(x),0,np.inf)[0]/self.__n
 
-        fname = mydir+'/rungrid.txt'
+        gamma=np.sqrt(1+test_momentum**2)
+        energy=(gamma-1)*self.__mc2 # E = (gamma-1)*mc^2
 
-        if os.path.isfile(fname):
-            rungrid = np.loadtxt(fname,skiprows=1)
+        r1,r2 = self.get_dist_u(test_momentum),self.get_dist(energy)
 
-            # This is backwards tracing, so fluxes will be calculated at the later
-            # time, which is given in the third column
+        print('USING DEFAULT ARGUMENTS\n')
 
-            runids = map(int,rungrid[:,0])
-            times = np.unique(rungrid[:,2])
-            rvals = np.unique(rungrid[:,3])
+        print('Maxwell Distribution:')
+        print('Compare f(u) and f(E) (should be same):')
+        print('{:}\t{:}'.format(m1,m2))
+        print('Integral of distribution function (should be 1):')
+        print('{:}\n'.format(res0))
 
-            if not np.allclose(rvals,rvals[0],1e-3):
-                raise Exception('Error in process_ram_boundary: points are not at fixed radial distance.')
+        print('Juttner Distribution:')
+        print('Compare f(u) and f(E) (should be same):')
+        print('{:}\t{:}'.format(j1,j2))
+        print('Integral of distribution function (should be 1):')
+        print('{:}\n'.format(res1))
 
-            fluxdata= {'rungrid':rungrid}
-            fluxdata['runid']=runids
-            fluxdata['times']=times
-            fluxdata['R']=rvals[0]
-            fluxdata['mlt'] = np.sort(np.unique(rungrid[:,4]))
+        print('Kappa Distribution:')
+        print('Compare f(v) and f(E) (should be same):')
+        print('{:}\t{:}'.format(k1,k2))
+        print('Integral of distribution function (should be 1):')
+        print('{:}\n'.format(res2))
 
-            for runid in runids:
-                fluxdata[runid] = self.process_run(runid)
-        else:
-            raise Exception('Error in process_rungrid: '+fname+' not found')
+        print('Relativisitc Kappa Distribution:')
+        print('Compare f(u) and f(E) (should be same):')
+        print('{:}\t{:}'.format(r1,r2))
+        print('Integral of distribution function (should be 1):')
+        print('{:}\n'.format(res3))
 
-        if(write_files):
-            self.write_ram_fluxes(fluxdata,date=date,outdir=outdir)
+        # Return to the original source type
+        self.set_source(params['source'],params)
 
-        return fluxdata
 
-    def write_ram_fluxes(self,fluxdata,date={'year':2000,'month':1,'day':1},outdir=None):
-        """
-        Write time- and space-dependent fluxes in a RAM boundary file
-        """
-        cadence=(fluxdata['times'][1]-fluxdata['times'][0])//60
+    def test_omni(self):
+        # Calculate omnidirectional flux for simple test cases
+        # Use sin^n(alpha) as the PAD and assume gyrotropic (2*pi factor)
+        import matplotlib.pyplot as plt
 
-        year = date['year']
-        month = date['month']
-        day = date['day']
+        def notch(x,n):
+            # Notched sine function to approximate missing data point
+            res = np.sin(x)**n*(1-np.exp(-((x-np.pi/2)/0.01)**2))
+            return res
 
-        fname = '{:4}{:02}{:02}_ptm_geomlt_{:}-min.txt'.format(year,month,day,cadence)
+        omni = np.array([2*np.pi*integrate.quad(lambda x:np.sin(x)*notch(x,n),0,np.pi)[0] for n in range(1,6)])
 
-        nenergy=fluxdata[1]['energies'].size
+        # First, uniformly sampled in angle space
+        qtest = np.linspace(0,np.pi,13)
+        ftest = np.array([notch(qtest,n) for n in range(1,6)])
+        omnia = self.get_omni_flux(qtest,ftest)
+        plt.plot(qtest,ftest[0,:],'ro',ms=10)
+        plt.plot(qtest,ftest[1:,:].T,'ro',ms=10,label='_nolegend_')
 
-        # Header lines
-        header1='# PTM Particle Fluxes for RAM\n'
-        header2='# Header Format string: (a24,a6,2x,a72,36a18)\n'
-        header3='# DATA   Format string: (a24,f6.1,2x,36(i2),36(f18.4))\n'
+        # Next, uniformly sampled in cos(pa) space
+        qtest = np.arccos(np.linspace(1,-1,13))
+        ftest = np.array([notch(qtest,n) for n in range(1,6)])
+        omnic = self.get_omni_flux(qtest,ftest)
+        plt.plot(qtest,ftest[0,:],'ko',ms=6)
+        plt.plot(qtest,ftest[1:,:].T,'ko',ms=6,label='_nolegend_')
 
-        # This parameter has to be in the file but it's not used by RAM
-        nsc = np.ones([nenergy],dtype='int')
-        nscstring=(nenergy*'{:2}').format(*nsc)
+        print("Omnidirection flux calculations:\n")
 
-        # Formatting strings
-        headFormat='{:>24}{:>6}  {:>72}'
-        dataFormat='{:6.1f}  '+nscstring+(nenergy*'{:18.4f}')
-        timeFormat='{:4}-{:02}-{:02}T{:02}:{:02}:{:02}.000Z'
+        print("Using spline method:")
+        print('{:}\t{:}'.format('Full Integral',omni))
+        print('{:}\t{:}'.format('Uniform PA',omnia))
+        print('{:}\t{:}\n'.format('Uniform COS(PA)',omnic))
 
-        with open(fname,'w') as f:
-            f.writelines(header1);
-            f.writelines(header2);
-            f.writelines(header3);
-            f.writelines(headFormat.format('CCSDS','MLT','NSC')+(nenergy*'{:18}'+'\n').format(*fluxdata[1]['energies']))
+        # First, uniformly sampled in angle space
+        qtest = np.linspace(0,np.pi,13)
+        ftest = np.array([notch(qtest,n) for n in range(1,6)])
+        omnia = self.get_omni_flux(qtest,ftest,method='bin')
 
-            i=0
-            for time in fluxdata['times']:
-                hour,minute,second = self.seconds_to_hhmmss(time)
-                for mlt in fluxdata['mlt']:
-                    i+=1
-                    saflux = fluxdata[i]['omni']/(4.0*np.pi)
-                    # Note asterisk in format statement (*np.r_), this is required for correct passing of values
-                    dataline = timeFormat.format(year,month,day,hour,minute,second)+dataFormat.format(*np.r_[mlt,saflux])+'\n'
-                    f.writelines(dataline)
+        # Next, uniformly sampled in cos(pa) space
+        qtest = np.arccos(np.linspace(1,-1,13))
+        ftest = np.array([notch(qtest,n) for n in range(1,6)])
+        omnic = self.get_omni_flux(qtest,ftest,method='bin')
+
+        print("Using binning method:")
+        print('{:}\t{:}'.format('Full Integral',omni))
+        print('{:}\t{:}'.format('Uniform PA',omnia))
+        print('{:}\t{:}\n'.format('Uniform COS(PA)',omnic))
+
+        xv=np.linspace(0,np.pi,1000)
+        for n in range(1,6):
+            yv=notch(xv,n)
+            plt.plot(xv,yv)
+
+        plt.title(r'$f(\alpha)=(1-\exp(-100(\alpha-\pi/2)^2)\sin^{n}(\alpha)$',fontsize=16)
+        plt.legend(['Uniform PA','Uniform cos(PA)','n=1','n=2','n=3','n=4','n=5'],frameon=False,loc='upper left')
+
+
+def process_ram_boundary(self,griddir=None,write_files=True,outdir=None,date={'year':2000,'month':1,'day':1}):
+    """
+    Rungrids are a new configuration option provided in the updated version of ptm_input.
+    In addition to the input files, there is a rungrid.txt file that
+    describes the characteristics of each input file (time and location).
+
+    When the RAM boundary is simulated using PTM via rungrid configuration, we are able to
+    simplify the post-processing workflow using this routine.
+    """
+
+    if griddir==None:
+        mydir = self.__filedir
+    else:
+        mydir = griddir
+
+    fname = mydir+'/rungrid.txt'
+
+    if os.path.isfile(fname):
+        rungrid = np.loadtxt(fname,skiprows=1)
+
+        # This is backwards tracing, so fluxes will be calculated at the later
+        # time, which is given in the third column
+
+        runids = map(int,rungrid[:,0])
+        times = np.unique(rungrid[:,2])
+        rvals = np.unique(rungrid[:,3])
+
+        if not np.allclose(rvals,rvals[0],1e-3):
+            raise Exception('Error in process_ram_boundary: points are not at fixed radial distance.')
+
+        fluxdata= {'rungrid':rungrid}
+        fluxdata['runid']=runids
+        fluxdata['times']=times
+        fluxdata['R']=rvals[0]
+        fluxdata['mlt'] = np.sort(np.unique(rungrid[:,4]))
+
+        for runid in runids:
+            fluxdata[runid] = self.process_run(runid)
+    else:
+        raise Exception('Error in process_rungrid: '+fname+' not found')
+
+    if(write_files):
+        self.write_ram_fluxes(fluxdata,date=date,outdir=outdir)
+
+    return fluxdata
+
+
+def write_ram_fluxes(self,fluxdata,date={'year':2000,'month':1,'day':1},outdir=None):
+    """
+    Write time- and space-dependent fluxes in a RAM boundary file
+    """
+    cadence=(fluxdata['times'][1]-fluxdata['times'][0])//60
+
+    year = date['year']
+    month = date['month']
+    day = date['day']
+
+    fname = '{:4}{:02}{:02}_ptm_geomlt_{:}-min.txt'.format(year,month,day,cadence)
+
+    nenergy=fluxdata[1]['energies'].size
+
+    # Header lines
+    header1='# PTM Particle Fluxes for RAM\n'
+    header2='# Header Format string: (a24,a6,2x,a72,36a18)\n'
+    header3='# DATA   Format string: (a24,f6.1,2x,36(i2),36(f18.4))\n'
+
+    # This parameter has to be in the file but it's not used by RAM
+    nsc = np.ones([nenergy],dtype='int')
+    nscstring=(nenergy*'{:2}').format(*nsc)
+
+    # Formatting strings
+    headFormat='{:>24}{:>6}  {:>72}'
+    dataFormat='{:6.1f}  '+nscstring+(nenergy*'{:18.4f}')
+    timeFormat='{:4}-{:02}-{:02}T{:02}:{:02}:{:02}.000Z'
+
+    with open(fname,'w') as f:
+        f.writelines(header1);
+        f.writelines(header2);
+        f.writelines(header3);
+        f.writelines(headFormat.format('CCSDS','MLT','NSC')+(nenergy*'{:18}'+'\n').format(*fluxdata[1]['energies']))
+
+        i=0
+        for time in fluxdata['times']:
+            hour,minute,second = self.seconds_to_hhmmss(time)
+            for mlt in fluxdata['mlt']:
+                i+=1
+                saflux = fluxdata[i]['omni']/(4.0*np.pi)
+                # Note asterisk in format statement (*np.r_), this is required for correct passing of values
+                dataline = timeFormat.format(year,month,day,hour,minute,second)+dataFormat.format(*np.r_[mlt,saflux])+'\n'
+                f.writelines(dataline)
+
+    return
+
+def tm03_moments(x,y,sw_user=None):
+    """
+    The Tsyganeko and Mukai [2003] plasma sheet model (with corrected equations).
+
+    Inputs:
+      x     GSM x position in Earth radii
+      y     GSM y position in Earth radii
+      sw_user   An optional dictionary which may contain the following keys:
+          'bperp' Perpendicular component of the solar wind magnetic field in nT
+          'theta' Solar wind clock angle in degrees
+          'vx'    Solar wind speed in km/s
+          'n'     Solar wind density in cm-3
+          'p'     Solar wind dynamic pressure in nPa
+
+    Default values of swD are {'bperp':5,'theta':90,'vx':500,'n':10,'p':3}, and the
+    user needs only to specify values that are different from these.
+
+    Outputs:
+      res   A dictionary with the following keys:
+          'P'   Local pressure in nPa
+          'T'   Local temperature in keV
+          'n'   Local ion/electron density in cm-3
+
+    Reference:
+
+    Tsyganeko, N. A. and T. Mukai (2003), Tail plasma sheet models derived from Geotail particle data,
+        J. Geophys. Res., 108(A3),1136, doi:10.1029/2002JA009707
+
+    The output from the TM03 model can be used to set n and Ec inputs to the energy_to_flux routine.
+
+    Jesse Woodroffe
+    6/2/2016
+
+    Modified to simplify interface and eliminate "double-call" initialization
+
+    """
+    TM03_defaults = {'bperp':5.0,'theta':90.0,'vx':500.0,'n':10.0,'p':3.0}
+
+    swD = {**TM03_defaults} if sw_user is None else {**TM03_defaults,**sw_user}
+
+    # Evaluate TM03 model using provided parameters
+    aT=np.r_[ 0.0000, 1.6780,-0.1606, 1.6690, 4.8200, 2.8550,-0.6020,-0.8360,
+             -2.4910, 0.2568, 0.2249, 0.1887,-0.4458,-0.0331,-0.0241,-2.6890,
+              1.2220]
+    aN=np.r_[ 0.0000,-0.1590, 0.6080, 0.5055, 0.0796, 0.2746, 0.0361,-0.0342,
+             -0.7935, 1.1620, 0.4756, 0.7117]
+    aP=np.r_[ 0.0000, 0.0570, 0.5240, 0.0908, 0.5270, 0.0780,-4.4220,-1.5330,
+             -1.2170, 2.5400, 0.3200, 0.7540, 1.0480,-0.0740, 1.0150]
+
+    bperp=swD['bperp']/5
+    bz=bperp*np.cos(np.deg2rad(swD['theta']))
+
+    bzn,bzs = (bz,0.0) if bz > 0.0 else (0.0,-bz)
+
+    vsw=swD['vx']/500.0
+    nsw=swD['n']/10.0
+    fsw=bperp*np.sqrt(np.sin(np.deg2rad(swD['theta'])/2))
+    rho=np.sqrt(x*x+y*y)/10.0
+    psw=swD['p']/3.0
+    phi=-np.arctan2(y,x)
+    rm1=rho-1.0
+
+    T=(aT[1]*vsw+aT[2]*bzn+aT[3]*bzs+aT[4]*
+       np.exp(-(aT[9]*vsw**aT[15]+aT[10]*bzn+aT[11]*bzs)*rm1)+
+       (aT[5]*vsw+aT[6]*bzn+aT[7]*bzs+aT[8]*
+        np.exp(-(aT[12]*vsw**aT[16]+aT[13]*bzn+aT[14]*bzs)*rm1))*np.sin(phi)**2)
+
+    N=((aN[1]+aN[2]*nsw**aN[10]+aN[3]*bzn+aN[4]*vsw*bzs)*rho**aN[8]+
+       (aN[5]*nsw**aN[11]+aN[6]*bzn+aN[7]*vsw*bzs)*rho**aN[9]*np.sin(phi)**2)
+
+    P=(aP[1]*rho**aP[6]+aP[2]*psw**aP[11]*rho**aP[7]+aP[3]*fsw**aP[12]*rho**aP[8]+
+       (aP[4]*psw**aP[13]*np.exp(-aP[9]*rho)+aP[5]*fsw**aP[14]*np.exp(
+           aP[10]*rho))*np.sin(phi)**2)
+
+    res={'P':P,'T':T,'n':N}
+
+    return res
+
+if __name__ == "__main__":
+
+    pp=ptm_postprocessor()
+    pp.test_distributions()
+    pp.test_omni()
