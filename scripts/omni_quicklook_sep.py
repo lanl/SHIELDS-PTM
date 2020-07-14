@@ -13,15 +13,15 @@ from ptm_python import ptm_postprocessing as post
 
 def calculate_omni(fluxmap, fov=False, initialE=False):
     pp = post.ptm_postprocessor()
-    
-    pp.set_source_parameters(n_dens=5e-6, e_char=500.0, kappa=4.0, mass=1847.0)
+
+    pp.set_source(source_type='kappa', params=dict(density=5e-6, energy=500.0, kappa=4.0, mass=1847.0))
     # n_dens      float       optional, number density at source region in cm-3
     # e_char      float       optional, characteristic energy of distribution in keV
     # kappa       float       optional, spectral index of kappa distribution
     # mass        float       optional, particle mass in multiples of electron mass
     if initialE:
         fluxmap['final_E'] = fluxmap['init_E']
-    diff_flux = pp.calculate_flux(fluxmap)
+    diff_flux = pp.map_flux(fluxmap)
     if not initialE:
         nener, nalph = diff_flux.shape
         for idx, jdx in it.product(range(nener), range(nalph)):
@@ -33,7 +33,7 @@ def calculate_omni(fluxmap, fov=False, initialE=False):
         angles = instrFOV(fluxmap)
         amask = angles < 90
         diff_flux[amask] = 0.
-    omni = pp.calculate_omnidirectional_flux(fluxmap['angles'], diff_flux)
+    omni = pp.get_omni_flux(fluxmap['angles'], diff_flux)
 
     return omni
 
@@ -46,7 +46,7 @@ def plot_omni(omni, fluxmap):
     ax0.set_xlabel('Energy [MeV]')
     ax0.set_ylabel('Diff. Flux [per MeV]')
     ax0.set_title(fluxmap.attrs['position'])
-    
+
     cdict, allow = cutoffs(fluxmap, addTo=ax0, linestyle='--', color='b', label_pre='Omni')
     #ax0.axvline(x=cdict['ec_low'], linestyle=':', color='k',
     #            label='E$_{c}^{low}$ = ' + '{0:.2f} MeV'.format(cdict['ec_low']))
@@ -95,7 +95,7 @@ def cutoffs(fluxmap, addTo=None, **kwargs):
     print('Ec_high = {}'.format(ec_high))
     prot_low = ptt.Proton(ec_low)
     prot_high = ptt.Proton(ec_high)
-    
+
     Nforbid = np.sum(allow*len(fluxmap['angles']))
     Ntot = len(allow)*len(fluxmap['angles'])
     r_low = prot_low.getRigidity()
