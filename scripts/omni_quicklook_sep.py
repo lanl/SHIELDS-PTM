@@ -14,7 +14,7 @@ from ptm_python import ptm_postprocessing as post
 def calculate_omni(fluxmap, fov=False, initialE=False):
     pp = post.ptm_postprocessor()
 
-    pp.set_source(source_type='kappa', params=dict(density=5e-6, energy=500.0, kappa=4.0, mass=1847.0))
+    pp.set_source(source_type='kaprel', params=dict(density=5e-6, energy=752.0, kappa=5.0, mass=1847.0))
     # n_dens      float       optional, number density at source region in cm-3
     # e_char      float       optional, characteristic energy of distribution in keV
     # kappa       float       optional, spectral index of kappa distribution
