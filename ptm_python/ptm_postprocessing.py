@@ -47,6 +47,40 @@ class ptm_postprocessor(object):
 
     def set_source(self,source_type='kappa', params={}):
         """Set source distribution type and parameters
+
+        Optional Arguments
+        ------------------
+        source_type : str
+            Distribution name. Default 'kappa', other options are
+            'kaprel', 'maxwell', 'juttner'
+        params : dict
+            Distribution parameters, all distributions have 'density',
+            'energy', and 'mass'. The two kappa distributions also have
+            'kappa'. Mass defaults to 1 in all cases, and is given in
+            units of the electron mass.
+
+        Distribution Parameters
+        -----------------------
+        kappa : (non-relativistic) kappa distribution
+            density - number density, default 1e-1 cm^-2
+            energy - characteristic energy, default 5 keV
+            kappa - kappa parameter, default 2.5
+        kaprel : relativistic Kappa-type distribution
+            density - number density, default 1e-2 cm^-2
+            energy - characteristic energy, default 100 keV
+            kappa - kappa parameter, default 5.0
+        maxwell : Maxwell-Boltzmann distribution
+            density - number density, default 1e-1
+            energy - characteristic energy, default 10 keV
+        juttner : Maxwell-Juttner (relativistic) distribution
+            density - number density, default 4.73e-3
+            energy - characteristic energy, default 160 keV
+
+        Notes
+        -----
+        The asymptotic characteristic energies differ between 'kappa' and 'kaprel',
+        so for comparison in the low-energy regime Ec(kappa) ~ 2*Ec(kaprel).
+        
         """
         if source_type not in self.__supported_distributions:
             raise ValueError('Specified source type ({:}) not supported'.format(source_type))
@@ -108,8 +142,8 @@ class ptm_postprocessor(object):
         a = 4*np.pi
         b = 8*special.beta(3/2,self.__kappa-2)/(2*self.__kappa-1)
         x = 1-2*self.__energy_ratio/self.__kappa
-        c = special.hyp2f1(self.__kappa+1,5/2,self.__kappa+1/2,x)*3
-        d = special.hyp2f1(self.__kappa+1,3/2,self.__kappa+1/2,x)*(self.__kappa-2)
+        c = special.hyp2f1(self.__kappa+1,5/2, self.__kappa+1/2,x)*3
+        d = special.hyp2f1(self.__kappa+1,3/2, self.__kappa+1/2,x)*(self.__kappa-2)
 
         self.__fcoef = self.__n*self.__ccm/(self.__ec*a*b*(c+d))
         self.__dcoef = self.__n/(a*b*(c+d)*self.__ckm**3)
