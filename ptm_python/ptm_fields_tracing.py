@@ -169,9 +169,8 @@ def find_field_line(mlt,r0,lat0,dlat=5.0,verbose=True,epserr=1e-2):
 
     doSearch = True
     isearch = 0
-        
+
     while doSearch:
-        
         pold = pos.copy()
 
         lat+=dlat
@@ -180,12 +179,13 @@ def find_field_line(mlt,r0,lat0,dlat=5.0,verbose=True,epserr=1e-2):
         isearch+=1
 
         if(verbose):
-            print lat, norm(pos), norm(pold)
+            print(lat, norm(pos), norm(pold))
         
         if(norm(pos) > norm(pold) or isearch>100 or abs(r0-norm(pos))<epserr):
             doSearch = False
             
     return pos
+
 
 def trace_field_line(mlt,rad,lat,ds=0.01,istep_max=100000):
     """
