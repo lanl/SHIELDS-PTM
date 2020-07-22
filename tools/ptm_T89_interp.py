@@ -9,16 +9,17 @@ import numpy as np
 import ptm_read
 import ptm_interpolate
 
+
 # get grid files and number of elements along each dim
 gridfiles = np.sort(glob.glob('ptm_T89_data/[xyz]*.txt'))
 
 nxyz = np.zeros(3, dtype=int)
 for i, fname in enumerate(gridfiles):
-	outfile = fname.replace('.txt', '.bin') 
-	xyzdata = np.loadtxt(gridfiles[i])
-	xyzdata.tofile(outfile)
-	nxyz[i] = xyzdata.size
-	
+    outfile = fname.replace('.txt', '.bin')
+    xyzdata = np.loadtxt(gridfiles[i])
+    xyzdata.tofile(outfile)
+    nxyz[i] = xyzdata.size
+
 nx = nxyz[0]
 ny = nxyz[1]
 nz = nxyz[2]
@@ -30,23 +31,23 @@ bfiles = np.sort(glob.glob('ptm_T89_data/b*.txt'))
 res = np.full((nx, ny, nz),0.0)
 
 for fi, fname in enumerate(bfiles):
-	boutfile = fname.replace('.txt', '.bin') 
-	boutfile = '_'.join(boutfile.rsplit('_T89_',1))
-	
-	bdata = np.loadtxt(fname)
+    boutfile = fname.replace('.txt', '.bin')
+    boutfile = '_'.join(boutfile.rsplit('_T89_',1))
 
-	for i in range(nx):
-		for j in range(ny):
-			for k in range(nz):
-				indx = i*nx**2 + j*ny**1 + k*nz**0
-				res[i,j,k] = bdata[indx]
-				
-	# write bfile data to file
-	res.tofile(boutfile)
+    bdata = np.loadtxt(fname)
 
-	# for each bfile data to file 
-	# create zero value efile data
-	eoutfile = boutfile.replace('b', 'e', 1)
-	eoutfile = '_'.join(eoutfile.rsplit('_T89_',1))
-	res = np.full((nx, ny, nz),0.0)
-	res.tofile(eoutfile)
+    for i in range(nx):
+        for j in range(ny):
+            for k in range(nz):
+                indx = i*nx**2 + j*ny**1 + k*nz**0
+                res[i,j,k] = bdata[indx]
+
+    # write bfile data to file
+    res.tofile(boutfile)
+
+    # for each bfile data to file
+    # create zero value efile data
+    eoutfile = boutfile.replace('b', 'e', 1)
+    eoutfile = '_'.join(eoutfile.rsplit('_T89_',1))
+    res = np.full((nx, ny, nz),0.0)
+    res.tofile(eoutfile)
