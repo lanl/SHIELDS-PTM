@@ -6,9 +6,6 @@
 #include <Lgm_QinDenton.h>
 
 
-void StringSplit( char *Str, char *StrArray[], int len, int *n );
-
-
 const  char *ProgramName = "ptm_lanlgeomag";
 const  char *argp_program_version     = "0.99";
 const  char *argp_program_bug_address = "<smorley@lanl.gov>";
@@ -96,13 +93,12 @@ int main( int argc, char *argv[] ){
     struct              Arguments arguments;
     int                 UseTS07=0;
     char                IntModel[20], ExtModel[20];
-    int                 i, j, k, retval;
+    int                 i, j, k;
     long int            JD, Date;
 
     double              UTC;
     Lgm_Vector          u, B;
     Lgm_MagModelInfo    *mInfo = Lgm_InitMagInfo(0);
-    Lgm_DateTime     DT_UTC;
     Lgm_QinDentonOne qd;
     char model_str[] = "T96";
 
