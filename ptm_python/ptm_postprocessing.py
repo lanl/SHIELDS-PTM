@@ -392,7 +392,7 @@ class ptm_postprocessor(object):
                 # fall back to single integer provided
                 fname = self.__filedir+'/map_{:04}.dat'.format(runid)
 
-        fluxmap = parse_map_file(fname)
+        fluxmap = pt.parse_map_file(fname)
 
         flux = self.map_flux(fluxmap)
         omni = self.get_omni_flux(fluxmap['angles'],flux)
