@@ -3,7 +3,7 @@
 !
 !+MODULE DESCRIPTION
 !   This module contains global constants and variables that need to be
-!   accessed by multiple other modules along with miscellaneous utility 
+!   accessed by multiple other modules along with miscellaneous utility
 !   routines.
 !
 !+AUTHOR
@@ -128,15 +128,15 @@ type particle
 end type particle
 
 interface read_array
-  ! These are routines to read 1-, 2-, and 3-dimensional binary data files 
+  ! These are routines to read 1-, 2-, and 3-dimensional binary data files
   ! with data stored in C-style.
-  module procedure read_array_1d, read_array_2d, read_array_3d 
+  module procedure read_array_1d, read_array_2d, read_array_3d
 end interface read_array
 
 contains
 
   subroutine assert(condition,caller,message)
-  ! Logical assertion-based error handling. To signal a failure 
+  ! Logical assertion-based error handling. To signal a failure
   ! without any test, just call assert with condition=.FALSE.
   implicit none
 
@@ -185,7 +185,7 @@ contains
   return
 
   end function int2str
-  
+
 !++++++++++++++++++++++++++++++++++++++++
 ! INTERFACE READ_ARRAY PROCEDURES
 !++++++++++++++++++++++++++++++++++++++++
@@ -251,12 +251,12 @@ contains
   return
 
   end subroutine read_array_1d
-  
+
 !++++++++++++++++++++++++++++++++++++++++
 ! Reading procedure for arrays having
 ! unspecified length
-!++++++++++++++++++++++++++++++++++++++++ 
-  
+!++++++++++++++++++++++++++++++++++++++++
+
   subroutine read_grid(fname,grid)
   ! This routine determines the number of lines in an ascii file,
   ! allocates an array for the appropriate number of values, then
@@ -264,14 +264,14 @@ contains
 
   ! Use the iso_fortran_env module to get the end-of-file status value
   use iso_fortran_env
-  
+
   implicit none
 
   character(len=*), intent(in) :: fname
   real(dp), dimension(:), allocatable, intent(out) :: grid
   integer :: lun, i, istat, n
 
-  open(file=fname,newunit=lun,status='old',iostat=istat)  
+  open(file=fname,newunit=lun,status='old',iostat=istat)
   call assert(istat==0,'read_grid','Error opening '//fname)
 
   ! Count the number of lines in the file
@@ -334,19 +334,19 @@ contains
   function outer_product(a,b) result(M)
   ! Calculate the outer product of two vectors
   implicit none
-  
+
   real(dp), dimension(:), intent(in) :: a,b
   real(dp), dimension(size(a),size(b)) :: M
   integer :: i, j
-  
+
   do i=1,size(a)
     do j=1,size(b)
       M(i,j) = a(i)*b(j)
     enddo
   enddo
-  
+
   return
-  
+
   end function outer_product
 
 !
@@ -354,57 +354,51 @@ contains
   function linspace(a,b,n) result(v)
   ! Find a linearly spaced vector of length n between a and b.
   ! This function copies the functionality of Matlab's linspace routine.
-  
+
   real(dp), intent(in) :: a, b
   integer, intent(in) :: n
   real(dp), dimension(n) :: v
   real(dp) :: dv
   integer :: i
-  
+
   call assert(n>0,'linspace','length of requested vector = '//int2str(n))
 
   if(n>1) then
-
     dv = (b-a)/real(n-1,dp)
-    
     do i=1,n
       v(i) = a+real(i-1,dp)*dv
     enddo
-
   else
-
     call assert(a/=b,'linspace','different endpoints for single element vector')
-
     v(1) = a
-
   endif
 
   return
 
   end function linspace
-  
+
 !++++++++++++++++++++++++++++++++++++++++
 ! Angular conversion functions
 !++++++++++++++++++++++++++++++++++++++++
-  
+
   function degrees(rads) result(v)
-  
+
   real(dp), intent(in) :: rads
   real(dp) :: v
-  
+
   v = rads/dtor
-  
+
   end function degrees
-  
-!  
-  
+
+!
+
   function radians(degs) result(v)
-  
+
   real(dp), intent(in) :: degs
   real(dp) :: v
-  
+
   v = degs*dtor
-  
+
   end function radians
 
 !++++++++++++++++++++++++++++++++++++++++
@@ -430,7 +424,7 @@ contains
 
   real(dp), intent(in) :: x
   real(dp) :: cosd
-  
+
   cosd = cos(dtor*x)
 
   end function cosd
@@ -441,14 +435,14 @@ contains
 
   function random_uniform() result(dev)
   ! This is a functionalized wrapper of Fortran's intrinsic
-  ! random number generator. 
+  ! random number generator.
   implicit none
 
   real(dp) :: dev
 
   call random_number(dev)
 
-  return 
+  return
 
   end function random_uniform
 

@@ -96,7 +96,7 @@ contains
   if(myParticle%t==merge(Tlo,Thi,itrace>0)) then
     upara = dot_product(bhat,myParticle%v)
     uperp = norm(myParticle%v-upara*bhat)
-    gam=sqrt(1.d0+(upara/ckm)**2+(uperp/ckm)**2)  
+    gam=sqrt(1.d0+(upara/ckm)**2+(uperp/ckm)**2)
   else
     if(myParticle%drift) then
       upara = myParticle%upara

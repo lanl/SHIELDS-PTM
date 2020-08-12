@@ -8,7 +8,7 @@
 !
 !+CONTAINS subroutines
 !   FIELD_INITIALIZE
-!   GET_FIELDS  
+!   GET_FIELDS
 !
 !+AUTHOR
 !   Jesse Woodroffe
@@ -94,7 +94,7 @@ contains
   ! iN jN kN bx(N) by(N) bz(N) ex(N) ey(N) ez(N)
   !
   ! Where i, j, k are indices corresponding to a particular element of the x, y, or z grid respectively
-  ! (i.e., the logical position) and N = nx*ny*nz. 
+  ! (i.e., the logical position) and N = nx*ny*nz.
   !
   ! The purpose of this routine is to make the field-specification data files more readable and flexible.
   ! This routine allows you to pick single components (e.g. ey only) or all of them, but the calling
@@ -118,7 +118,7 @@ contains
   ! Allocate and read the grids if appropriate, otherwise just skip past them
   if(present(xv)) then
       if(.not. allocated(xv)) allocate(xv(numx))
-      call assert(size(xv)==numx,'read_fields','xgrid size mismatch')    
+      call assert(size(xv)==numx,'read_fields','xgrid size mismatch')
       read(lun,*) xv
   else
       read(lun,*)
@@ -134,7 +134,7 @@ contains
 
   if(present(zv)) then
       if(.not. allocated(zv)) allocate(zv(numz))
-      call assert(size(zv)==numz,'read_fields','zgrid size mismatch')    
+      call assert(size(zv)==numz,'read_fields','zgrid size mismatch')
       read(lun,*) zv
   else
       read(lun,*)

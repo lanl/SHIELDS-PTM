@@ -53,7 +53,7 @@ DO n=1,nparticles
     call push(myParticle,myParticle%t+sign(dtOut,real(itrace,dp)))   !  advance myParticle one dtOut (in file ptm_pars)
     call storeData(myParticle,particleData(iwrite,:))                        !  store data every output file cadence
     ! exit when finished or when problems were encountered with particle time-stepping in stepper_push
-    if(.not. myParticle%integrate .or. iwrite==nwrite) exit               
+    if(.not. myParticle%integrate .or. iwrite==nwrite) exit
     iwrite = iwrite+1
     lastepoch=myParticle%t
   enddo
@@ -88,7 +88,7 @@ contains
   implicit none
 
   integer :: argnum, arglen, argstat
-  character(len=4) :: argstr            ! set at run 
+  character(len=4) :: argstr            ! set at run
 ! character(len=4) :: id_string         ! output of this subr, not declared here, but in GLOBAL.f90
 
   argnum = 1

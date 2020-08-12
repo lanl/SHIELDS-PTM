@@ -14,7 +14,7 @@
 !   12 March 2015:    Original code
 !    6 April 2015:    Modified code to use RKSUITE90 integrators via local function passing.
 !                     As far as I know, only IFORT has this F2008 feature implemented, need to check PGF90
-!    5 May 2016:      Modified timestep selection to ensure proper matching of actual times to requested times. 
+!    5 May 2016:      Modified timestep selection to ensure proper matching of actual times to requested times.
 !                     Code has been validated to run on GNU Fortran 4.8.2 with the -std=f2008ts flag
 !    3 August 2020:   Heavily streamlined code
 
@@ -28,20 +28,20 @@ use fields
 contains
 
   subroutine push(myParticle,tnext)
-  ! This is the main particle pushing routine 
+  ! This is the main particle pushing routine
 
   implicit none
 
   type(particle) :: myParticle
   real(dp), intent(in) :: tnext
   real(dp), parameter :: kappa_orbit = 1.0d-2 ! These two values are set so that a particle doesn't just
-  real(dp), parameter :: kappa_drift = 0.8d-2 ! oscillate between drift and orbit in regions of marginal smoothness  
+  real(dp), parameter :: kappa_drift = 0.8d-2 ! oscillate between drift and orbit in regions of marginal smoothness
   real(dp), parameter :: dt_base = 1.0d-6     ! small parameter used to set a maximum number of timesteps
   real(dp) :: kappa, t, t_int
   real(dp), dimension(:), allocatable :: y
   real(dp), dimension(:), allocatable :: yp
   integer :: i, iflag, nstep, nstep_max
-  
+
   abstract interface
     function deriv_f(t,y) result(ydot)
       integer, parameter :: dp = kind(1.d0)
@@ -50,7 +50,7 @@ contains
       real(dp), dimension(size(y)) :: ydot
     end function deriv_f
   end interface
-  
+
   PROCEDURE(deriv_f), POINTER :: deriv
 
   ! Initialize storage for the integrators and communicators if using RKSuite (istep=2)
@@ -68,14 +68,14 @@ contains
   if(istep==2) call setup(myParticle%comm,myParticle%t,y,tnext,tol,(/(thresh,i=1,size(y))/),method='M',task='R',message=.FALSE.)
 
   nstep_max = ceiling(abs(tnext-myParticle%t)/dt_base)
-  
+
   ! nstep_max is set to be a large fininte number in order to prevent infinite iteration if the timestep approaches zero
   do nstep=1,nstep_max
 
     t = myParticle%t
 
 	! Part 1 -- Determine Integration Parameters
-    
+
     kappa = get_kappa(myParticle)
 
     if (kappa >= kappa_orbit) then ! Use full particle orbits
@@ -102,37 +102,37 @@ contains
     endif
 
     ! PART 2 -- Timestep Advance
-    
+
     call calculate_timestep(myParticle)
 
     ! Check if the timestep is going to take us beyond requested point. If so, set limit of integration appropriately.
     t_int = merge(min(tnext,myParticle%t+myParticle%dt),max(tnext,myParticle%t+myParticle%dt),itrace>0)
-   
+
     select case(istep)
       case(1) ! Use fixed timestep RK4 integrator
-        call rk4(deriv,y,t,t_int-t)  
+        call rk4(deriv,y,t,t_int-t)
       case(2) ! Use adaptive RKSuite integrator (ADP)
         call range_integrate(myParticle%comm,deriv,t_int,t,y,yp,flag=iflag)
         if(iflag==5) myParticle%integrate = .FALSE.
       case default
         call assert(.FALSE.,"push","istep "//int2str(istep)//" not currently supported.")
-    end select      
-    	
+    end select
+
     myParticle%y(1:size(y)) = y
     myParticle%t = t_int
-	
+
     ! PART 3 -- Boundary Checks
-    
+
     ! Check if particle is incident on the atmosphere
-    if(norm(myParticle%x) <= 1.d0) myParticle%integrate=.FALSE.  
-    
+    if(norm(myParticle%x) <= 1.d0) myParticle%integrate=.FALSE.
+
     ! Check if particle has reached outer boundaries
     select case(ibound)
       case(1) ! Bounded by limits of domain
         if (myParticle%x(1) < XMin .or. myParticle%x(1) > XMax) myParticle%integrate = .FALSE.
         if (myParticle%x(2) < YMin .or. myParticle%x(2) > YMax) myParticle%integrate = .FALSE.
         if (myParticle%x(3) < ZMin .or. myParticle%x(3) > ZMax) myParticle%integrate = .FALSE.
-        if (myParticle%t < TMin .or. myParticle%t > TMax) myParticle%integrate = .FALSE.                
+        if (myParticle%t < TMin .or. myParticle%t > TMax) myParticle%integrate = .FALSE.
       case(2) ! Bounded by plane in negative-x direction
         if (myParticle%x(1) <= xsource) myParticle%integrate=.FALSE.
       case(3) ! Bounded by radial distance
@@ -140,7 +140,7 @@ contains
       case default
         call assert(.FALSE.,"push","ibound "//int2str(istep)//" not currently supported")
     end select
-    
+
     if(.not. myParticle%integrate .or. t_int == tnext) exit
 
   enddo
@@ -179,7 +179,7 @@ contains
     else
       ! This particle is being taken offline, don't worry about calculating anything.
       ydot = 0.d0
-  
+
     endif
 
     return
@@ -208,7 +208,7 @@ contains
       myParticle%t = t
       myParticle%y(1:4) = y
       call get_fields(myParticle,bvec,evec=evec,gradb=Bgrad,grade=Egrad)
-      
+
       b0 = norm(bvec)
       bhat = bvec/b0
       gami = 1.d0/sqrt(1.d0+(2.d0*b0*myParticle%mu+myParticle%upara**2)/csq)
@@ -226,9 +226,9 @@ contains
 
       curlbhat = (curlb-cross_product(gradb,bhat))/b0
       dbhatdt = (bhat*dot_product(bhat,curle)-curle)/b0
-      
+
       ! Calculate effective fields
-      bstar = bvec+myParticle%upara*curlbhat/myParticle%qmr 
+      bstar = bvec+myParticle%upara*curlbhat/myParticle%qmr
       bstarpara = dot_product(bhat,bstar)
       estar = evec-(myParticle%upara*dbhatdt+myParticle%mu*gradb*gami)/myParticle%qmr
 
@@ -248,13 +248,13 @@ contains
     return
 
     end function drift
-	
+
     !
 
     subroutine calculate_timestep(myParticle)
 
     implicit none
-  
+
     type(particle) :: myParticle
     real(dp) :: usq, gami, b0, wc
     real(dp), dimension(3) :: evec, bvec, bhat, curlb, gradb, curlbhat, fE, fG, fC
@@ -273,11 +273,11 @@ contains
       curlb(3) = Bgrad(1,2)-Bgrad(2,1)
       gradb = matmul(Bgrad,bhat)
       curlbhat = (curlb-cross_product(gradb,bhat))/b0
-  
+
       fE = myParticle%qmr*evec                                             ! Electric force
       fG = myParticle%mu*gradb*gami                                        ! Gradient force including mirror term
       fC = myParticle%upara**2*cross_product(curlbhat,bhat)*gami           ! Curvature force
-  
+
       myParticle%dt = sign(epsilon_drift*sqrt(usq)/norm(fE+fG+fC),real(itrace,dp))
     else
       ! Pick orbit time step to resolve gyro-orbits
@@ -285,18 +285,18 @@ contains
       gami = 1.d0/sqrt(1.d0+usq/csq)
       wc = myParticle%qmr*b0*gami
       myParticle%dt = sign(epsilon_orbit/wc,real(itrace,dp))
-    endif  
+    endif
 
     return
 
     end subroutine calculate_timestep
-	
+
 	!
-	
+
     function get_kappa(myParticle) result(kappa)
-	
+
     implicit none
-	
+
     real(dp) :: kappa
     type(particle), intent(in) :: myParticle
     real(dp) :: b0, usq, uperp, gami, wc, rho
@@ -319,25 +319,25 @@ contains
           uperp = sqrt(2.d0*b0*myParticle%mu)
         else
           usq = dot_product(myParticle%v,myParticle%v)
-          uperp = norm(myParticle%v-dot_product(bhat,myParticle%v)*bhat)      
+          uperp = norm(myParticle%v-dot_product(bhat,myParticle%v)*bhat)
         endif
-        
+
         gami = 1.d0/sqrt(1.d0+usq/csq)
         wc = abs(myParticle%qmr*b0*gami)
-        rho = uperp/wc  
+        rho = uperp/wc
         gradb = matmul(Bgrad,bhat)
         kappa = rho*norm(gradb)/b0
-		
+
     end select
-	
+
     return
-	
+
     end function get_kappa
-	
+
   end subroutine push
 
   !
-  
+
   subroutine full_to_drift(myParticle)
   ! Switch from full orbit (vx, vy, vz) to guiding center (mu, vpara)
 
@@ -346,16 +346,16 @@ contains
   type(particle) :: myParticle
   real(dp) :: b0, upara, gami, wc
   real(dp), dimension(3) :: bvec, bhat, uperp
-  
+
   call get_fields(myParticle,bvec)
 
   ! Determine local magnetic field and it direction
   b0 = norm(bvec)
   bhat = bvec/b0
   gami = 1.d0/sqrt(1.d0+dot_product(myParticle%v,myParticle%v)/csq)
-  
+
   wc = gami*myParticle%qmr*b0
-  
+
   upara= dot_product(bhat,myParticle%v)
   uperp = myParticle%v-upara*bhat
 
@@ -372,7 +372,7 @@ contains
   ! Determine current drift parameters
   myParticle%upara = upara
   myParticle%mu = dot_product(uperp,uperp)/(2.d0*b0)
-  
+
   myParticle%drift = .TRUE.
 
   return
@@ -399,9 +399,9 @@ contains
   b0 = norm(bvec)
   bhat = bvec/b0
   gami = 1.d0/sqrt(1.d0+2.d0*b0*myParticle%mu+myParticle%upara**2)
-  
+
   wc = abs(myParticle%qmr*b0*gami)
-  
+
   vpara = myParticle%upara
   vperp = sqrt(2.d0*b0*myParticle%mu)
   rho = vperp/(re*wc)
@@ -414,7 +414,7 @@ contains
       ! Get gyrovector in Cartesian coordinates
       R = fac_rotation_matrix(myParticle,toCartesian=.TRUE.)
       rhat = matmul(R,[cos(phi),sin(phi),0.0d0])
-	  
+
       vhat = sign(1.d0,myParticle%qmr)*cross_product(bhat,rhat)
       vhat = vhat/norm(vhat)
 
@@ -469,11 +469,11 @@ contains
   myParticle%x = myParticle%x+rho*rhat
   myParticle%v = vpara*bhat+vperp*vhat
   myParticle%drift = .FALSE.
-  
+
   if(associated(myParticle%upara)) then
     myParticle%upara => NULL()
   endif
-  
+
   if(associated(myParticle%mu)) then
     myParticle%mu => NULL()
   endif
@@ -481,7 +481,7 @@ contains
   return
 
   end subroutine drift_to_full
-  
+
   !
 
   subroutine rk4(derivs,y,t,dt)

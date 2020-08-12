@@ -7,8 +7,8 @@
 !   and field-aligned coordinate systems.
 !
 !+CONTAINS subroutines
-!   PARTICLES_INITIALIZE  
-!   PARTICLE_INITIALIZE  
+!   PARTICLES_INITIALIZE
+!   PARTICLE_INITIALIZE
 !   FAC_ROTATION_MATRIX
 !
 !+AUTHOR
