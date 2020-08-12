@@ -15,7 +15,7 @@ use global
 use fileio
 use particles
 use fields
-use stepper
+use pusher
 use omp_lib
 
 implicit none
@@ -50,7 +50,7 @@ DO n=1,nparticles
 
   do
     if (mod(iwrite,360).eq.0) write (*,*) 'particle ',n,' time =',myParticle%t
-    call stepper_push(myParticle,myParticle%t+sign(dtOut,real(itrace,dp)))   !  advance myParticle one dtOut (in file ptm_pars)
+    call push(myParticle,myParticle%t+sign(dtOut,real(itrace,dp)))   !  advance myParticle one dtOut (in file ptm_pars)
     call storeData(myParticle,particleData(iwrite,:))                        !  store data every output file cadence
     ! exit when finished or when problems were encountered with particle time-stepping in stepper_push
     if(.not. myParticle%integrate .or. iwrite==nwrite) exit               

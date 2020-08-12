@@ -23,8 +23,6 @@ use rksuite_90
 use fields
 use interpolation
 
-integer, parameter, private :: irand = 2001
-
 integer, private :: idist, idens
 real(dp), private :: x0, y0, z0, E0, alpha, vtperp, vtpara, vz0, vp0
 real(dp), private :: xsMin, xsMax, ysMin, ysMax, zsMin, zsMax, mltMin, mltMax, r0
@@ -45,37 +43,32 @@ contains
   real(dp) :: gam, vt
   integer :: i
 
+  ! Configure velocity space distribution
+
+  open(newunit=lun,file='ptm_input/dist_velocity_'//id_string//'.txt',action='read',status='old',iostat=ierr)
+  call assert(ierr==0,'particles_initialize','error opening dist_velocity_'//id_string//'.txt')
 
   ! Initialize the system Random Number Generator
   call random_seed(size=nseed)
-  call random_seed(put=(/(irand+i,i=0,nseed-1)/))
+  call random_seed(put=(/(iseed+i,i=0,nseed-1)/))
 
-
-  ! Configure velocity space distribution
-
-  lun = get_open_unit()
-  open(unit=lun,file='ptm_input/dist_velocity_'//id_string//'.txt',action='read',status='old',iostat=ierr)
-  call assert(ierr==0,'particles_initialize','error opening dist_velocity_'//id_string//'.txt')
-
+  ! Read in the user-specified distribution function type
   read(lun,*) idist
-
 
   select case(idist)
 
     case(1)
       ! Monoenergetic ring distribution
       read(lun,*) E0
-      write (*,*) 'Particle Energy =',E0
       read(lun,*) alpha
-      write (*,*) 'Pitch Angle =',alpha
       read(lun,*) phi0
-      gam = 1.0+E0/(mass*mc2)
+      gam = 1.d0+E0/(mass*mc2)
       vt = ckm*sqrt(gam*gam-1)/gam
-      vp0 = gam*vt*sind(alpha)
-      vz0 = gam*vt*cosd(alpha)
+      vp0 = vt*sind(alpha)
+      vz0 = vt*cosd(alpha)
 
     case(2)
-      ! Bi-Maxwellian distribution
+      ! Non-relativistic Bi-Maxwellian distribution
       read(lun,*) vtperp
       read(lun,*) vtpara
       read(lun,*) phi0
@@ -105,7 +98,7 @@ contains
       allocate(energies(abs(nEnergies)))
 
       if(nEnergies==1) then
-          energies=EkevMin
+        energies=EkevMin
       else
         energies = linspace(EkevMin,EkevMax,nEnergies)
       endif
@@ -134,8 +127,8 @@ contains
 
       allocate(pitchAngles(abs(nPitchAngles)))
       allocate(energies(abs(nEnergies)))
-      call read_array('ptm_data/energies_'//id_string//'.bin',energies)
-      call read_array('ptm_data/pitchangles_'//id_string//'.bin',pitchAngles)
+      call read_array('ptm_data/energies.bin',energies)
+      call read_array('ptm_data/pitchangles.bin',pitchAngles)
 
     case default
 
@@ -148,7 +141,7 @@ contains
 
   ! Configure physical space distributions
 
-  open(unit=lun,file='ptm_input/dist_density_'//id_string//'.txt',action='read',status='old',iostat=ierr)
+  open(newunit=lun,file='ptm_input/dist_density_'//id_string//'.txt',action='read',status='old',iostat=ierr)
   call assert(ierr==0,'particles_initialize','error opening dist_density_'//id_string//'.txt')
 
   read(lun,*) idens
@@ -173,8 +166,9 @@ contains
     case default
       call assert(.FALSE.,'particles_initialize','idens='//int2str(idens)//' not supported')
 
-
   end select
+
+  close(lun)
 
   return
 
@@ -250,15 +244,26 @@ contains
   real(dp) :: vp, vz, v
   real(dp), dimension(3) :: bvec, bhat, rhat
   real(dp), dimension(3,3) :: R
-  real(dp) :: gam, phi, dx, dy, dz, dt
+  real(dp) :: gam, phi, dx, dy, dz, dt, wc
   integer :: im, jm, km, lm, iEnergy, iPitchAngle
+
+  real(dp) :: usq, gami, b0
+  real(dp), dimension(3) :: evec, curlb, curlbhat, gradb, fE, fG, fC
+  real(dp), dimension(3,3) :: Bgrad
 
   myParticle%drift = .FALSE.
   myParticle%integrate = .TRUE.
 
+  allocate(myParticle%p(2))
+  allocate(myParticle%y(7))
+  myParticle%x => myParticle%y(1:3)
+  myParticle%v => myParticle%y(4:6)
+
   myParticle%p(1) = e_me*charge_mass_ratio
   myParticle%p(2) = mass*mc2
 
+  myParticle%qmr => myParticle%p(1)
+  myParticle%mc2 => myParticle%p(2)
 
 ! initialize particle location (x,y,z)
 
@@ -267,82 +272,60 @@ contains
     case(1) ! All particles start at same position
       x = x0
       y = y0
-      if(ndim==2) then ! Put the particle in the center of a unit cell in z
-        z = 0.5d0
-      else            ! Full 3d grids are being used
-        z = z0
-      endif
-
+      z = z0
     case(2) ! Particles are seeded randomly throughout a rectangular region
       x = xsMin+(xsMax-xsMin)*random_uniform()
       y = ysMin+(ysMax-ysMin)*random_uniform()
-      if(ndim==2) then
-        z = 0.5d0
-      else
-        z = zsMin+(zsMax-zsMin)*random_uniform()
-      endif
-
+      z = zsMin+(zsMax-zsMin)*random_uniform()
     case(3) ! Particles are seeded along the equator at a fixed radial distance and random local times
       phi = 2*pi*(mltMin+random_uniform()*(mltMax-mltMin))/24.0d0
       x = r0*sin(phi)
       y = r0*cos(phi)
-      z = merge(0.5d0,0.0d0,ndim==2)
+      z = 0.0d0
     case default
       call assert(.FALSE.,'particle_initialize','idens='//int2str(idens)//' not supported')
   end select
 
+  myParticle%x = [x,y,z]
 
-! initialize particle velocity vector (vp,vz)
+  ! initialize particle velocity components (vp,vz)
 
   select case(idist)
     case(1) ! Initialize a particle beam
       vp = vp0
       vz = vz0
+      gam = 1.0/sqrt(1.d0-(vp**2+vz**2)/csq)
+
     case(2) ! Bi-Maxwellian
-      do ! Get perpendicular momentum is from a truncated normal distribution
+      do ! Get perpendicular velocity truncated normal distribution
         vp = vtperp*random_gauss()
         if(vp>0.d0) exit
       enddo
-      ! Parallel momentum comes from a normal Maxwellian
+      ! Parallel velocity from a normal distribution
       vz = vtpara*random_gauss()
+      gam = 1.0/sqrt(1.d0-(vp**2+vz**2)/csq)
+
     case(3:4) ! Set up particle properties for flux map mode
       call assert(present(tag),'particle_initialize','idist=3 requires specification of particle tag in calling routine')
       myParticle%tag = tag
       iEnergy = ceiling(tag/real(nPitchAngles))
       iPitchAngle = tag-(iEnergy-1)*nPitchAngles
-      gam = 1.0+energies(iEnergy)/myParticle%p(2)
-      v = ckm*sqrt(gam*gam-1.d0)
+      gam = 1.0+energies(iEnergy)/myParticle%mc2
+      v = ckm*sqrt(gam*gam-1.d0)/gam
       vp = v*sind(pitchAngles(iPitchAngle))
       vz = v*cosd(pitchAngles(iPitchAngle))
-
       myParticle%fluxMapCoordinates(1:6) = [merge(thi,tlo,itrace<0),x,y,z,energies(iEnergy),pitchAngles(iPitchAngle)]
 
     case default
       call assert(.FALSE.,'particle_initialize','idist='//int2str(idist)//' not supported')
+
   end select
-
-
-  ! Seed gyrophase as appropriate
-  phi = merge(dtor*phi0,twopi*random_uniform(),phi0>0.0d0)
-  gam = sqrt(1.d0+(vp**2+vz**2)/csq)                       ! not used and good only for mildly relativistic
-
-  if(ndim==2) vz = 0.d0 ! Just in case of roundoff error
-
 
   ! *********** construct myParticle object
 
-  ! Target component pointers
-  allocate(myParticle%y(7))
-  myParticle%x => myParticle%y(1:3)
-  myParticle%v => myParticle%y(4:6)
-
-  myParticle%x(1) = x
-  myParticle%x(2) = y
-  myParticle%x(3) = z
-
   ! Set the particle at the correct time in order to allow for forward and reverse tracing
   myParticle%t = merge(Tlo,Thi,itrace>0)
-  myParticle%drift = .FALSE.
+  myParticle%drift = iswitch<0
 
   ! Initialize the grid and interpolators
   im = locate(xgrid,x)
@@ -355,28 +338,18 @@ contains
   dz = zgrid(km+1)-zgrid(km)
   dt = tgrid(lm+1)-tgrid(lm)
 
-
   call grid_init(myParticle%grid,im,jm,km,lm,dx,dy,dz,dt)
+  call get_fields(myParticle,bvec,doInit=.TRUE.)
 
-  ! Call the fields routine to initialize the tricubic coefficients and determine the initial timestep
-
-  call get_fields(myParticle,bvec,doInit=.TRUE.)   ! calculates the mag field at point myParticle%x thru tricubic (spatial) interpolation
-
-  bhat = bvec/norm(bvec)                           ! mag field direction
-
+  bhat = bvec/norm(bvec)                                  ! mag field direction
   R = fac_rotation_matrix(myParticle,toCartesian=.TRUE.)  ! rotation from PQB field-aligned to Cartesian coordinates
-  rhat = matmul(R,[cos(phi),sin(phi),0.0d0])              ! rotation by gyro-phase ?
+  phi = merge(radians(phi0),twopi*random_uniform(),phi0>0.d0)
+  rhat = matmul(R,[cos(phi),sin(phi),0.d0])
 
-  ! Initialize particle velocity in Cartesian coordinates
-  myParticle%v = vz*bhat+vp*rhat
+  myParticle%v = gam*(vz*bhat+vp*rhat)
+
   ! Store initial cartesian components for flux mapping
   myParticle%fluxMapCoordinates(7:9) = myParticle%v
-
-  if(istep==2) then ! Longer steps with the adaptive RK method
-    myParticle%dt = sign(epsilon_drift/abs(myParticle%p(1)*norm(bvec)),real(itrace,dp))   ! dt=sign(itrace)*epsilon/(eB/m)
-  else
-    myParticle%dt = sign(epsilon_orbit/abs(myParticle%p(1)*norm(bvec)),real(itrace,dp))
-  endif
 
   return
 

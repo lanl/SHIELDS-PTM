@@ -23,17 +23,14 @@ contains
   character(len=4) :: test_string
   integer :: lun, ierr
 
-  lun = get_open_unit()
-  open(unit=lun,file='ptm_input/ptm_parameters_'//id_string//'.txt',action='read',status='old',iostat=ierr)
+  open(newunit=lun,file='ptm_input/ptm_parameters_'//id_string//'.txt',action='read',status='old',iostat=ierr)
 
   call assert(ierr==0,'read_ptm_parameters','could not open ptm_parameters_'//id_string//'.txt')
 
   read(lun,*) runid
+  read(lun,*) iseed
   read(lun,*) nparticles
   read(lun,*) ndim
-  read(lun,*) nx
-  read(lun,*) ny
-  read(lun,*) nz
   read(lun,*) itrace
   read(lun,*) ifirst
   read(lun,*) ilast
@@ -49,6 +46,12 @@ contains
   read(lun,*) tlo
   read(lun,*) thi
   read(lun,*) itraj
+  read(lun,*) ibound
+  if(ibound == 2) then
+    read(lun,*) xsource
+  else if(ibound==3) then
+    read(lun,*) rbound
+  endif
 
   ! Gyrophase switching. dphi is defined in the GLOBAL module
   call assert(nphase > 0,'read_ptm_parameters','nphase must be greater than zero.')
@@ -82,7 +85,7 @@ contains
   real(dp), dimension(8), intent(out) :: dataStore
   real(dp), dimension(3) :: bvec, bhat, xpos, gradb, rvec
   real(dp), dimension(3,3) :: Bgrad
-  real(dp) :: b0, vpara, vperp, gam
+  real(dp) :: b0, upara, uperp, gam
 
   call get_fields(myParticle,bvec,gradb=Bgrad)
   b0 = norm(bvec)
@@ -90,34 +93,28 @@ contains
 
 ! Store lab frame quantities = orbit params
 
-  if(myParticle%drift) then
-    vpara = myParticle%v(1)
-    vperp = sqrt(2.0d0*b0*myParticle%v(2))
-    gradb = matmul(Bgrad,bhat)
-    rvec = cross_product(gradb,bhat); rvec = rvec/norm(rvec)
-    xpos = myParticle%x-vperp*rvec/(re*b0*myParticle%p(1))
+  if(myParticle%t==merge(Tlo,Thi,itrace>0)) then
+    upara = dot_product(bhat,myParticle%v)
+    uperp = norm(myParticle%v-upara*bhat)
+    gam=sqrt(1.d0+(upara/ckm)**2+(uperp/ckm)**2)  
   else
-    vpara = dot_product(bhat,myParticle%v)
-    vperp = norm(myParticle%v-vpara*bhat)
-    xpos = myParticle%x
+    if(myParticle%drift) then
+      upara = myParticle%upara
+      uperp = sqrt(2.0d0*b0*myParticle%mu)
+    else
+      upara = dot_product(bhat,myParticle%v)
+      uperp = norm(myParticle%v-upara*bhat)
+    endif
   endif
 
-  gam=sqrt(1.d0+(vpara/ckm)**2+(vperp/ckm)**2)  ! gam = sqrt(1+beta**2) is good only for semi-relativistic
+  gam=sqrt(1.d0+(upara/ckm)**2+(uperp/ckm)**2)
 
   dataStore(1) = myParticle%t
-  dataStore(2:4) = xpos
-  dataStore(5) = vperp/gam
-  dataStore(6) = vpara/gam
-  dataStore(7) = myParticle%p(2)*(gam-1.d0)
-
-  ! Save pitch angle
-  if(vpara==0.0d0) then ! Handle special case to avoid divide-by-zero error
-    dataStore(8) = 90.0d0
-  else ! Use absolute value because we're only concerned about relative angle here
-    ! TODO: saving PA in [0-90] is good here, as long as we're able to cover the
-    !       full range of PA when generating vpara & vperp
-    dataStore(8) = atan(abs(vperp/vpara))/dtor
-  endif
+  dataStore(2:4) = myParticle%x
+  dataStore(5) = uperp/gam
+  dataStore(6) = upara/gam
+  dataStore(7) = myParticle%mc2*(gam-1.d0)
+  dataStore(8) = degrees(atan2(uperp,upara))
 
   return
 
@@ -138,20 +135,18 @@ contains
   integer :: i, lun, ierr
   logical, save :: firstCall = .TRUE.
 
-  lun = get_open_unit()
-
   if(firstCall) then
-    open(unit=lun,file='ptm_output/ptm_'//id_string//'.dat',action='write',status='replace')
+    open(newunit=lun,file='ptm_output/ptm_'//id_string//'.dat',action='write',status='replace')
     firstCall = .FALSE.
   else
-    open(unit=lun,file='ptm_output/ptm_'//id_string//'.dat',action='write',status='old',position='append',iostat=ierr)
+    open(newunit=lun,file='ptm_output/ptm_'//id_string//'.dat',action='write',status='old',position='append',iostat=ierr)
     call assert(ierr==0,'writeDataStore','error opening ptm_'//int2str(runid)//'.dat')
   endif
 
   write(lun,*) '# ', tag
   ! The # symbol separates data from different particles
 
-  do i=1,size(dataStore,1)
+  do i=lbound(dataStore,1),ubound(dataStore,1)
     write(lun,'(8es17.7e3)') dataStore(i,:)
   enddo
 
@@ -174,26 +169,24 @@ contains
   real(dp) :: gam, b0, energy
   real(dp), dimension(3) :: bvec
 
-  lun = get_open_unit()
-
   if(firstCall) then
-    open(unit=lun,file='ptm_output/map_'//id_string//'.dat',action='write',status='replace')
+    open(newunit=lun,file='ptm_output/map_'//id_string//'.dat',action='write',status='replace')
     write(lun,'(4es17.7e3)') myParticle%fluxMapCoordinates(1:4)
     firstCall = .FALSE.
   else
-     open(unit=lun,file='ptm_output/map_'//id_string//'.dat',action='write',status='old',position='append',iostat=ierr)
+     open(newunit=lun,file='ptm_output/map_'//id_string//'.dat',action='write',status='old',position='append',iostat=ierr)
      call assert(ierr==0,'writeFluxCoordinates','error opening ptm_'//int2str(runid)//'.dat')
   endif
 
   if(myParticle%drift) then
     call get_fields(myParticle,bvec)
     b0 = norm(bvec)
-    gam=sqrt(1.0+(myParticle%v(1)/ckm)**2+2.0d0*b0*myParticle%v(2)/csq)
+    gam=sqrt(1+(myParticle%upara/ckm)**2+2*b0*myParticle%mu/csq)
   else
-    gam=sqrt(1.0d0+dot_product(myParticle%v,myParticle%v)/csq)
+    gam=sqrt(1+dot_product(myParticle%v,myParticle%v)/csq)
   endif
 
-  energy = (gam-1.0d0)*myParticle%p(2)
+  energy = (gam-1)*myParticle%mc2
 
   ! Write fluxmap data. Time (1), final position (2,3,4), ?? (5,6),
   ! ?final/initial? energy (7), initial velocity vector (8,9,10)

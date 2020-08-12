@@ -27,7 +27,7 @@ real(dp), parameter :: csq = ckm*ckm
 real(dp), parameter :: mc2 = 5.11d2
 real(dp), parameter :: pi = 4.d0*atan(1.d0)
 real(dp), parameter :: dtor = pi/180.d0
-real(dp), parameter :: e_me = 1.76d2
+real(dp), parameter :: e_me = 1.758d2
 real(dp), parameter :: me_e = 1.d0/e_me
 real(dp), parameter :: re = 6371.d0
 real(dp), parameter :: tol = 1.0d-6
@@ -35,8 +35,10 @@ real(dp), parameter :: thresh = 1.0d-10
 real(dp), parameter :: twopi = 8.d0*atan(1.d0)
 real(dp), parameter :: epsilon_drift = 0.1d0
 real(dp), parameter :: epsilon_orbit = 0.05d0
+real(dp), dimension(3,3), parameter :: eye = reshape([1.d0,0.d0,0.d0,0.d0,1.d0,0.d0,0.d0,0.d0,1.d0],[3,3])
 
 integer :: runid
+integer :: iseed
 integer :: ndim
 integer :: istep
 integer :: iswitch
@@ -52,6 +54,7 @@ integer :: nz
 integer :: nt
 integer :: nparticles
 integer :: itraj
+integer :: ibound
 
 character(len=4) :: id_string     ! why here ? move to PTM.f90 subroutine get_run_id
 
@@ -71,6 +74,7 @@ real(dp) :: charge_mass_ratio
 real(dp) :: tlo
 real(dp) :: thi
 real(dp) :: xsource
+real(dp) :: rbound
 
 logical :: fluxMap = .FALSE.
 
@@ -114,7 +118,8 @@ type particle
   real(dp), dimension(:), pointer :: x                      ! Position
   real(dp), dimension(:), pointer :: v                      ! Relativistic velocity
   real(dp), dimension(:), pointer :: y                      ! Actual storage
-  real(dp), dimension(3) :: p                               ! Parameters: p(1) = charge/mass ratio; p(2) = particle mass in keV
+  real(dp), pointer :: mu, upara, qmr, mc2
+  real(dp), dimension(:), pointer:: p                       ! Parameters: p(1) = charge/mass ratio; p(2) = particle mass in keV
   real(dp), dimension(2,64) :: bxinterp, byinterp, bzinterp ! Tricubic interpolation coefficients for B
   real(dp), dimension(2,64) :: exinterp, eyinterp, ezinterp ! Tricubic interpolation coefficients for E
   type(rk_comm_real_1d) :: comm                             ! Communicator for use with RKSuite
@@ -163,28 +168,6 @@ contains
 
 !
 
-  function get_open_unit() result(lun)
-  ! Find a file unit that's not already open and associated with a file. 
-  implicit none
-
-  integer, parameter :: LUNMIN = 10
-  integer, parameter :: LUNMAX = 100
-  integer :: lun
-  logical :: isOpen
-
-  do lun=LUNMIN,LUNMAX
-    inquire(unit=lun,opened=isOpen)
-    if(.not. isOpen) exit
-  enddo
-
-  call assert(lun<LUNMAX,'get_open_unit','all units are already open')
-
-  return
-
-  end function get_open_unit
-
-!
-
   function int2str(i) result(istr)
   ! Create a string version of an integer number
   implicit none
@@ -202,7 +185,7 @@ contains
   return
 
   end function int2str
-
+  
 !++++++++++++++++++++++++++++++++++++++++
 ! INTERFACE READ_ARRAY PROCEDURES
 !++++++++++++++++++++++++++++++++++++++++
@@ -218,9 +201,7 @@ contains
   real(dp), dimension(size(dat3d,3),size(dat3d,2),size(dat3d,1)) :: temp
   integer :: j, lun
 
-  lun = get_open_unit()
-
-  open(unit=lun,file=fname,access='stream',form='unformatted')
+  open(newunit=lun,file=fname,access='stream',form='unformatted')
   read(lun) temp
   close(lun)
 
@@ -243,13 +224,11 @@ contains
   real(dp), dimension(size(dat2d,1),size(dat2d,2)) :: temp
   integer :: lun
 
-  lun = get_open_unit()
-
-  open(unit=lun,file=fname,access='stream',form='unformatted')
+  open(newunit=lun,file=fname,access='stream',form='unformatted')
   read(lun) temp
   close(lun)
 
-  dat2d = temp!transpose(temp)
+  dat2d = temp
 
   return
 
@@ -265,15 +244,56 @@ contains
   real(dp), dimension(:), intent(out) :: dat1d
   integer :: lun
 
-  lun = get_open_unit()
-
-  open(unit=lun,file=fname,access='stream',form='unformatted')
+  open(newunit=lun,file=fname,access='stream',form='unformatted')
   read(lun) dat1d
   close(lun)
 
   return
 
   end subroutine read_array_1d
+  
+!++++++++++++++++++++++++++++++++++++++++
+! Reading procedure for arrays having
+! unspecified length
+!++++++++++++++++++++++++++++++++++++++++ 
+  
+  subroutine read_grid(fname,grid)
+  ! This routine determines the number of lines in an ascii file,
+  ! allocates an array for the appropriate number of values, then
+  ! reads in the values into the newly-allocated array.
+
+  ! Use the iso_fortran_env module to get the end-of-file status value
+  use iso_fortran_env
+  
+  implicit none
+
+  character(len=*), intent(in) :: fname
+  real(dp), dimension(:), allocatable, intent(out) :: grid
+  integer :: lun, i, istat, n
+
+  open(file=fname,newunit=lun,status='old',iostat=istat)  
+  call assert(istat==0,'read_grid','Error opening '//fname)
+
+  ! Count the number of lines in the file
+  n=0
+  do
+    read(unit=lun,fmt=*,iostat=istat)
+    if(istat == iostat_end) exit
+    call assert(istat==0,'read_grid','Error reading from '//fname)
+    n=n+1
+  enddo
+
+  ! Allocate the array with appropriate number of values
+  allocate(grid(n))
+
+  ! Return to the beginning of the file and read it into the array
+  rewind(lun)
+  read(lun,*) grid
+  close(lun)
+
+  return
+
+  end subroutine read_grid
 
 !++++++++++++++++++++++++++++++++++++++++
 ! Utility Functions
@@ -311,6 +331,26 @@ contains
 
 !
 
+  function outer_product(a,b) result(M)
+  ! Calculate the outer product of two vectors
+  implicit none
+  
+  real(dp), dimension(:), intent(in) :: a,b
+  real(dp), dimension(size(a),size(b)) :: M
+  integer :: i, j
+  
+  do i=1,size(a)
+    do j=1,size(b)
+      M(i,j) = a(i)*b(j)
+    enddo
+  enddo
+  
+  return
+  
+  end function outer_product
+
+!
+
   function linspace(a,b,n) result(v)
   ! Find a linearly spaced vector of length n between a and b.
   ! This function copies the functionality of Matlab's linspace routine.
@@ -342,6 +382,30 @@ contains
   return
 
   end function linspace
+  
+!++++++++++++++++++++++++++++++++++++++++
+! Angular conversion functions
+!++++++++++++++++++++++++++++++++++++++++
+  
+  function degrees(rads) result(v)
+  
+  real(dp), intent(in) :: rads
+  real(dp) :: v
+  
+  v = rads/dtor
+  
+  end function degrees
+  
+!  
+  
+  function radians(degs) result(v)
+  
+  real(dp), intent(in) :: degs
+  real(dp) :: v
+  
+  v = degs*dtor
+  
+  end function radians
 
 !++++++++++++++++++++++++++++++++++++++++
 ! Degree-argument trigonometric functions

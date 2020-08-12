@@ -27,61 +27,23 @@ contains
   implicit none
 
   integer :: i,j
-  character(len=22) :: dfile
+  character(len=28) :: dfile
 
-  ! Allocate storage for global arrays
-  allocate(xgrid(nx),ygrid(ny))          ! nx,ny,nz are set in file ptm_pars 
+  ! Read temporal and spatial grids
 
-  if(ndim==2) then
-    allocate(zgrid(2))
-    allocate(BX3D(nt,nx,ny,2),BY3D(nt,nx,ny,2),BZ3D(nt,nx,ny,2))
-    allocate(EX3D(nt,nx,ny,2),EY3D(nt,nx,ny,2),EZ3D(nt,nx,ny,2))
-  else
-    allocate(zgrid(nz))
-    allocate(BX3D(nt,nx,ny,nz),BY3D(nt,nx,ny,nz),BZ3D(nt,nx,ny,nz))
-    allocate(EX3D(nt,nx,ny,nz),EY3D(nt,nx,ny,nz),EZ3D(nt,nx,ny,nz))
-  endif
+  call read_grid('ptm_data/tgrid.dat',tgrid)
+  ifirst = maxval(maxloc(tgrid,tgrid<=tlo))
+  ilast = maxval(maxloc(tgrid,tgrid>=thi))
+  nt = ilast-ifirst+1
+  TMin = tgrid(ifirst)
+  TMax = tgrid(ilast)
 
-  ! Read spatial grid. Interface READ_ARRAY/subroutines read_array_1d,2d,3d are in module GLOBAL 
-  call read_array('ptm_data/xgrid.bin',xgrid)
-  call read_array('ptm_data/ygrid.bin',ygrid)
+  write(dfile,'("ptm_data/ptm_fields_",i4.4,".dat")') ifirst
+  call read_fields(dfile,xv=xgrid,yv=ygrid,zv=zgrid)
 
-  if(ndim==3) then
-    call read_array('ptm_data/zgrid.bin',zgrid)
-  else
-    zgrid = (/0.d0,1.d0/)
-  endif
-
-   !A That XYZ grid created by ptm_preprocessing.py in ptm_data/bin files and with its nodes nx*ny*nz
-   !   is read now using the nodes nx,ny,nz specified by PTM_input.py in  ptm_input/ptm_parameters.txt file
-   ! The two sets (nx,ny,nz) must match: PTM will crash if you read more grid than available or, if you read less, 
-   !   it will get to "XYZ out of bounds" or, worse, it will not stop but will output NaN's after a much longer run.
-
-    if (size(xgrid).ne.nx.or.size(ygrid).ne.ny) then
-     write (*,*) "Mismatch bewteen size of XY grid in input data files and input ptm_parameters. Run stopped."
-     stop
-    end if
-    if (ndim.eq.3.and.size(zgrid).ne.nz) then
-     write (*,*) "Mismatch between size of Z grid in input data files and input ptm_parameters. Run stopped."
-     stop
-    end if
-
-
-  ! Read/construct time grid
-  if (dtIn > 0.0d0) then
-    allocate(tgrid(nt))   ! We are specifying what files to use, determine the times corresponding to those files
-    TMin = 0.0d0
-    TMax = dtIn*real(nt-1,dp)        ! dtIN is cadence (s) read by module FILEIO from file ptm_pars
-    tgrid = linspace(TMin,Tmax,nt)   ! nt is number of tstepts set in FILEIO
-  else
-    allocate(tgrid(ntot))     ! We are reading in the grid directly, figure out what files are needed
-    call read_array('ptm_data/tgrid.bin',tgrid)
-    ifirst = maxval(maxloc(tgrid,tgrid<=tlo))       ! maxval has no effect on a 0D array 
-    ilast = maxval(minloc(tgrid,tgrid>=thi))
-    nt = ilast-ifirst+1
-    TMin = tgrid(ifirst)
-    TMax = tgrid(ilast)
-  endif
+  nx = size(xgrid)
+  ny = size(ygrid)
+  nz = size(zgrid)
 
   XMin = minval(xgrid)
   XMax = maxval(xgrid)
@@ -94,89 +56,121 @@ contains
   write(*,*) xmin, " <= X <= ", xmax
   write(*,*) ymin, " <= Y <= ", ymax
   write(*,*) zmin, " <= Z <= ", zmax
-  !write(*,*) tmin, " <= T <= ", tmax
+  write(*,*) tmin, " <= T <= ", tmax
 
+  ! Allocate storage for electromagnetic fields
+  allocate(BX3D(nt,nx,ny,nz))
+  allocate(BY3D,BZ3D,EX3D,EY3D,EZ3D,mold=BX3D)
 
-  ! Get electromagnetic fields, number ndim of space dimensions is set in file ptm_pars
+  ! Get electromagnetic fields
+  write(*,*) "Reading 3D electromagnetic field data"
 
-  if(ndim==2) then
+  do j=ifirst,ilast
 
-    write(*,*) "Reading 2D electromagnetic field data" 
+    i = j-ifirst+1
 
-    do j=ifirst,ilast
-      i=j-ifirst+1
+    write(dfile,'("ptm_data/ptm_fields_",i4.4,".dat")') j
+    call read_fields(dfile,bxm=BX3D(i,:,:,:),bym=BY3D(i,:,:,:),bzm=BZ3D(i,:,:,:), &
+                           exm=EX3D(i,:,:,:),eym=EY3D(i,:,:,:),ezm=EZ3D(i,:,:,:))
 
-      write(dfile,'("ptm_data/bx2d_",i4.4,".bin")') j
-      call read_array(dfile,BX3D(i,:,:,1))
-      BX3D(i,:,:,2) = BX3D(i,:,:,1)
+  enddo
 
-      write(dfile,'("ptm_data/by2d_",i4.4,".bin")') j
-      call read_array(dfile,BY3D(i,:,:,1))
-      BY3D(i,:,:,2) = BY3D(i,:,:,1)
+  return
 
-      write(dfile,'("ptm_data/bz2d_",i4.4,".bin")') j
-      call read_array(dfile,BZ3D(i,:,:,1))
-      BZ3D(i,:,:,2) = BZ3D(i,:,:,1)
+  end subroutine fields_initialize
 
-      write(dfile,'("ptm_data/ex2d_",i4.4,".bin")') j
-      call read_array(dfile,EX3D(i,:,:,1))
-      EX3D(i,:,:,2) = EX3D(i,:,:,1)
+!
 
-      write(dfile,'("ptm_data/ey2d_",i4.4,".bin")') j
-      call read_array(dfile,EY3D(i,:,:,1))
-      EY3D(i,:,:,2) = EY3D(i,:,:,1)
+  subroutine read_fields(fname,xv,yv,zv,bxm,bym,bzm,exm,eym,ezm)
+  ! Read data from a regular cartesian grid in PTM's XYZ format. The general structure of the file is
+  !
+  ! nx ny nz
+  ! x(1) x(2) ... x(nx-1) x(nx)
+  ! y(1) y(2) ... y(ny-1) y(ny)
+  ! z(1) z(2) ... z(nz-1) z(nz)
+  ! i1 j1 k1 bx(1) by(1) bz(1) ex(1) ey(1) ez(1)
+  ! ...
+  ! ...
+  ! iN jN kN bx(N) by(N) bz(N) ex(N) ey(N) ez(N)
+  !
+  ! Where i, j, k are indices corresponding to a particular element of the x, y, or z grid respectively
+  ! (i.e., the logical position) and N = nx*ny*nz. 
+  !
+  ! The purpose of this routine is to make the field-specification data files more readable and flexible.
+  ! This routine allows you to pick single components (e.g. ey only) or all of them, but the calling
+  ! sequence requires each argument other than fname to be specified as a keyword.
 
-      write(dfile,'("ptm_data/ez2d_",i4.4,".bin")') j
-      call read_array(dfile,EZ3D(i,:,:,1))
-      EZ3D(i,:,:,2) = EZ3D(i,:,:,1)
+  implicit none
 
-    enddo
+  character(len=*), intent(in) :: fname
+  real(dp), dimension(:), allocatable, optional :: xv, yv, zv
+  real(dp), dimension(:,:,:), optional :: bxm, bym, bzm, exm, eym, ezm
+  real(dp) :: bx, by, bz, ex, ey, ez
+  integer :: lun, i, j, k, istat, n, ntot, numx, numy, numz
 
+  open(newunit=lun,file=fname,status='old',iostat=istat,action='read')
+  call assert(istat==0,'read_fields','Error opening '//fname)
+
+  read(lun,*) numx, numy, numz
+
+  ntot = numx*numy*numz
+
+  ! Allocate and read the grids if appropriate, otherwise just skip past them
+  if(present(xv)) then
+      if(.not. allocated(xv)) allocate(xv(numx))
+      call assert(size(xv)==numx,'read_fields','xgrid size mismatch')    
+      read(lun,*) xv
   else
+      read(lun,*)
+  endif
 
-    write(*,*) "Reading 3D electromagnetic field data"
+  if(present(yv)) then
+      if(.not. allocated(yv)) allocate(yv(numy))
+      call assert(size(yv)==numy,'read_fields','ygrid size mismatch')
+      read(lun,*) yv
+  else
+      read(lun,*)
+  endif
 
-    do j=ifirst,ilast
+  if(present(zv)) then
+      if(.not. allocated(zv)) allocate(zv(numz))
+      call assert(size(zv)==numz,'read_fields','zgrid size mismatch')    
+      read(lun,*) zv
+  else
+      read(lun,*)
+  endif
 
-      i = j-ifirst+1
+  ! If user has asked for any field components, read the file and grab the appropriate ones.
+  if(any([present(bxm),present(bym),present(bzm),present(exm),present(eym),present(ezm)])) then
 
-      write(dfile,'("ptm_data/bx3d_",i4.4,".bin")') j
-      call read_array(dfile,BX3D(i,:,:,:))
+    ! Check that fields are properly allocated and have the appropriate shape to hold the data
+    if(present(bxm)) call assert(all([size(bxm,1)==numx,size(bxm,2)==numy,size(bxm,3)==numz]),'read_fields','bx shape mismatch')
+    if(present(bym)) call assert(all([size(bym,1)==numx,size(bym,2)==numy,size(bym,3)==numz]),'read_fields','by shape mismatch')
+    if(present(bzm)) call assert(all([size(bzm,1)==numx,size(bzm,2)==numy,size(bzm,3)==numz]),'read_fields','bz shape mismatch')
+    if(present(exm)) call assert(all([size(exm,1)==numx,size(exm,2)==numy,size(exm,3)==numz]),'read_fields','ex shape mismatch')
+    if(present(eym)) call assert(all([size(eym,1)==numx,size(eym,2)==numy,size(eym,3)==numz]),'read_fields','ey shape mismatch')
+    if(present(ezm)) call assert(all([size(ezm,1)==numx,size(ezm,2)==numy,size(ezm,3)==numz]),'read_fields','ez shape mismatch')
 
-      write(dfile,'("ptm_data/by3d_",i4.4,".bin")') j
-      call read_array(dfile,BY3D(i,:,:,:))
+    do n=1,ntot
+      read(lun,*,iostat=istat) i, j, k, bx, by, bz, ex, ey, ez
+      call assert(istat==0,'read_fields','Error reading '//fname)
 
-      write(dfile,'("ptm_data/bz3d_",i4.4,".bin")') j
-      call read_array(dfile,BZ3D(i,:,:,:))
-
-      write(dfile,'("ptm_data/ex3d_",i4.4,".bin")') j
-      call read_array(dfile,EX3D(i,:,:,:))
-
-      write(dfile,'("ptm_data/ey3d_",i4.4,".bin")') j
-      call read_array(dfile,EY3D(i,:,:,:))
-
-      write(dfile,'("ptm_data/ez3d_",i4.4,".bin")') j
-      call read_array(dfile,EZ3D(i,:,:,:))
+      if(present(bxm)) bxm(i,j,k)=bx
+      if(present(bym)) bym(i,j,k)=by
+      if(present(bzm)) bzm(i,j,k)=bz
+      if(present(exm)) exm(i,j,k)=ex
+      if(present(eym)) eym(i,j,k)=ey
+      if(present(ezm)) ezm(i,j,k)=ez
 
     enddo
 
   endif
 
-    !A Just in case that you are careless enough to run PTM with mismatching XYZ and Bxyz grids
-    ! because you used input data files created by PTM_INPUT.py with different ! nx*ny*nz nodes:
-
-    if (size(xgrid).ne.size(BX3D,2).or.size(ygrid).ne.size(BX3D,3)) then
-     write (*,*) "Mismatch bewteen size of XY and Bxy grids in input data files.  Run stopped."
-     stop
-    end if
-    if (ndim.eq.3.and.size(zgrid).ne.size(BX3D,4)) then
-     write (*,*) "Mismatch bewteen size of Z and Bz grids in input data files.  Run stopped."
-     stop
-    end if
+  close(lun)
 
   return
 
-  end subroutine fields_initialize
+  end subroutine read_fields
 
 !
 
@@ -231,12 +225,8 @@ contains
     if(myParticle%x(1) >= xmax) myParticle%x(1) = xmax!-0.5*myParticle%grid%dx
     if(myParticle%x(2) <= ymin) myParticle%x(2) = ymin!+0.5*myParticle%grid%dy
     if(myParticle%x(2) >= ymax) myParticle%x(2) = ymax!-0.5*myParticle%grid%dy
-    if(ndim==2) then
-      myParticle%x(3) = 0.5d0
-    else
-      if(myParticle%x(3) <= zmin) myParticle%x(3) = zmin+0.5*myParticle%grid%dz
-      if(myParticle%x(3) >= zmax) myParticle%x(3) = zmax-0.5*myParticle%grid%dz
-    endif
+    if(myParticle%x(3) <= zmin) myParticle%x(3) = zmin!+0.5*myParticle%grid%dz
+    if(myParticle%x(3) >= zmax) myParticle%x(3) = zmax!-0.5*myParticle%grid%dz
     if(myParticle%t < tmin) myParticle%t = tmin
     if(myParticle%t > tmax) myParticle%t = tmax
 
@@ -245,7 +235,6 @@ contains
   im = locate(xgrid,myParticle%x(1))
   jm = locate(ygrid,myParticle%x(2))
   km = locate(zgrid,myParticle%x(3))
-!  lm = locate(tgrid,myParticle%t)
 
   if(TMin < minval(tgrid) .and. myParticle%t < minval(tgrid)) then
     ! We assume fields remain constant at earlier times
@@ -340,51 +329,30 @@ contains
             bx_y(ii,jj,kk)  = deriv1(yseg,bx3d(l,i,jmin:jmax,k),idx=idy)
             bx_xy(ii,jj,kk) = deriv2(xseg,yseg,bx3d(l,imin:imax,jmin:jmax,k),idx=idx,idy=idy)
 
-            if(ndim==2) then ! Uniform in the z-direction
-              bx_z(ii,jj,kk)   = 0.d0
-              bx_xz(ii,jj,kk)  = 0.d0
-              bx_yz(ii,jj,kk)  = 0.d0
-              bx_xyz(ii,jj,kk) = 0.d0
-            else
-              bx_z(ii,jj,kk)   = deriv1(zseg,bx3d(l,i,j,kmin:kmax),idx=idz)
-              bx_xz(ii,jj,kk)  = deriv2(xseg,zseg,bx3d(l,imin:imax,j,kmin:kmax),idx=idx,idy=idz)
-              bx_yz(ii,jj,kk)  = deriv2(yseg,zseg,bx3d(l,i,jmin:jmax,kmin:kmax),idx=idy,idy=idz)
-              bx_xyz(ii,jj,kk) = deriv3(xseg,yseg,zseg,bx3d(l,imin:imax,jmin:jmax,kmin:kmax),idx=idx,idy=idy,idz=idz)
-            endif
+            bx_z(ii,jj,kk)   = deriv1(zseg,bx3d(l,i,j,kmin:kmax),idx=idz)
+            bx_xz(ii,jj,kk)  = deriv2(xseg,zseg,bx3d(l,imin:imax,j,kmin:kmax),idx=idx,idy=idz)
+            bx_yz(ii,jj,kk)  = deriv2(yseg,zseg,bx3d(l,i,jmin:jmax,kmin:kmax),idx=idy,idy=idz)
+            bx_xyz(ii,jj,kk) = deriv3(xseg,yseg,zseg,bx3d(l,imin:imax,jmin:jmax,kmin:kmax),idx=idx,idy=idy,idz=idz)
 
             ! Derivatives of the X-component of the field
             by_x(ii,jj,kk)  = deriv1(xseg,by3d(l,imin:imax,j,k),idx=idx)
             by_y(ii,jj,kk)  = deriv1(yseg,by3d(l,i,jmin:jmax,k),idx=idy)
             by_xy(ii,jj,kk) = deriv2(xseg,yseg,by3d(l,imin:imax,jmin:jmax,k),idx=idx,idy=idy)
 
-            if(ndim==2) then ! Uniform in the z-direction
-              by_z(ii,jj,kk)   = 0.d0
-              by_xz(ii,jj,kk)  = 0.d0
-              by_yz(ii,jj,kk)  = 0.d0
-              by_xyz(ii,jj,kk) = 0.d0
-            else
-              by_z(ii,jj,kk)   = deriv1(zseg,by3d(l,i,j,kmin:kmax),idx=idz)
-              by_xz(ii,jj,kk)  = deriv2(xseg,zseg,by3d(l,imin:imax,j,kmin:kmax),idx=idx,idy=idz)
-              by_yz(ii,jj,kk)  = deriv2(yseg,zseg,by3d(l,i,jmin:jmax,kmin:kmax),idx=idy,idy=idz)
-              by_xyz(ii,jj,kk) = deriv3(xseg,yseg,zseg,by3d(l,imin:imax,jmin:jmax,kmin:kmax),idx=idx,idy=idy,idz=idz)
-            endif
+            by_z(ii,jj,kk)   = deriv1(zseg,by3d(l,i,j,kmin:kmax),idx=idz)
+            by_xz(ii,jj,kk)  = deriv2(xseg,zseg,by3d(l,imin:imax,j,kmin:kmax),idx=idx,idy=idz)
+            by_yz(ii,jj,kk)  = deriv2(yseg,zseg,by3d(l,i,jmin:jmax,kmin:kmax),idx=idy,idy=idz)
+            by_xyz(ii,jj,kk) = deriv3(xseg,yseg,zseg,by3d(l,imin:imax,jmin:jmax,kmin:kmax),idx=idx,idy=idy,idz=idz)
 
             ! Derivatives of the X-component of the field
             bz_x(ii,jj,kk)  = deriv1(xseg,bz3d(l,imin:imax,j,k),idx=idx)
             bz_y(ii,jj,kk)  = deriv1(yseg,bz3d(l,i,jmin:jmax,k),idx=idy)
             bz_xy(ii,jj,kk) = deriv2(xseg,yseg,bz3d(l,imin:imax,jmin:jmax,k),idx=idx,idy=idy)
 
-            if(ndim==2) then ! Uniform in the z-direction
-              bz_z(ii,jj,kk)   = 0.d0
-              bz_xz(ii,jj,kk)  = 0.d0
-              bz_yz(ii,jj,kk)  = 0.d0
-              bz_xyz(ii,jj,kk) = 0.d0
-            else
-              bz_z(ii,jj,kk)   = deriv1(zseg,bz3d(l,i,j,kmin:kmax),idx=idz)
-              bz_xz(ii,jj,kk)  = deriv2(xseg,zseg,bz3d(l,imin:imax,j,kmin:kmax),idx=idx,idy=idz)
-              bz_yz(ii,jj,kk)  = deriv2(yseg,zseg,bz3d(l,i,jmin:jmax,kmin:kmax),idx=idy,idy=idz)
-              bz_xyz(ii,jj,kk) = deriv3(xseg,yseg,zseg,bz3d(l,imin:imax,jmin:jmax,kmin:kmax),idx=idx,idy=idy,idz=idz)
-            endif
+            bz_z(ii,jj,kk)   = deriv1(zseg,bz3d(l,i,j,kmin:kmax),idx=idz)
+            bz_xz(ii,jj,kk)  = deriv2(xseg,zseg,bz3d(l,imin:imax,j,kmin:kmax),idx=idx,idy=idz)
+            bz_yz(ii,jj,kk)  = deriv2(yseg,zseg,bz3d(l,i,jmin:jmax,kmin:kmax),idx=idy,idy=idz)
+            bz_xyz(ii,jj,kk) = deriv3(xseg,yseg,zseg,bz3d(l,imin:imax,jmin:jmax,kmin:kmax),idx=idx,idy=idy,idz=idz)
 
             !**********************************
             ! DERIVATIVES OF THE ELECTRIC FIELD
@@ -394,51 +362,30 @@ contains
             ex_y(ii,jj,kk)  = deriv1(yseg,ex3d(l,i,jmin:jmax,k),idx=idy)
             ex_xy(ii,jj,kk) = deriv2(xseg,yseg,ex3d(l,imin:imax,jmin:jmax,k),idx=idx,idy=idy)
 
-            if(ndim==2) then ! Uniform in the z-direction
-              ex_z(ii,jj,kk)   = 0.d0
-              ex_xz(ii,jj,kk)  = 0.d0
-              ex_yz(ii,jj,kk)  = 0.d0
-              ex_xyz(ii,jj,kk) = 0.d0
-            else
-              ex_z(ii,jj,kk)   = deriv1(zseg,ex3d(l,i,j,kmin:kmax),idx=idz)
-              ex_xz(ii,jj,kk)  = deriv2(xseg,zseg,ex3d(l,imin:imax,j,kmin:kmax),idx=idx,idy=idz)
-              ex_yz(ii,jj,kk)  = deriv2(yseg,zseg,ex3d(l,i,jmin:jmax,kmin:kmax),idx=idy,idy=idz)
-              ex_xyz(ii,jj,kk) = deriv3(xseg,yseg,zseg,ex3d(l,imin:imax,jmin:jmax,kmin:kmax),idx=idx,idy=idy,idz=idz)
-            endif
+            ex_z(ii,jj,kk)   = deriv1(zseg,ex3d(l,i,j,kmin:kmax),idx=idz)
+            ex_xz(ii,jj,kk)  = deriv2(xseg,zseg,ex3d(l,imin:imax,j,kmin:kmax),idx=idx,idy=idz)
+            ex_yz(ii,jj,kk)  = deriv2(yseg,zseg,ex3d(l,i,jmin:jmax,kmin:kmax),idx=idy,idy=idz)
+            ex_xyz(ii,jj,kk) = deriv3(xseg,yseg,zseg,ex3d(l,imin:imax,jmin:jmax,kmin:kmax),idx=idx,idy=idy,idz=idz)
 
             ! Derivatives of the Y-component
             ey_x(ii,jj,kk)  = deriv1(xseg,ey3d(l,imin:imax,j,k),idx=idx)
             ey_y(ii,jj,kk)  = deriv1(yseg,ey3d(l,i,jmin:jmax,k),idx=idy)
             ey_xy(ii,jj,kk) = deriv2(xseg,yseg,ey3d(l,imin:imax,jmin:jmax,k),idx=idx,idy=idy)
 
-            if(ndim==2) then ! Uniform in the z-direction
-              ey_z(ii,jj,kk)   = 0.d0
-              ey_xz(ii,jj,kk)  = 0.d0
-              ey_yz(ii,jj,kk)  = 0.d0
-              ey_xyz(ii,jj,kk) = 0.d0
-            else
-              ey_z(ii,jj,kk)   = deriv1(zseg,ey3d(l,i,j,kmin:kmax),idx=idz)
-              ey_xz(ii,jj,kk)  = deriv2(xseg,zseg,ey3d(l,imin:imax,j,kmin:kmax),idx=idx,idy=idz)
-              ey_yz(ii,jj,kk)  = deriv2(yseg,zseg,ey3d(l,i,jmin:jmax,kmin:kmax),idx=idy,idy=idz)
-              ey_xyz(ii,jj,kk) = deriv3(xseg,yseg,zseg,ey3d(l,imin:imax,jmin:jmax,kmin:kmax),idx=idx,idy=idy,idz=idz)
-            endif
+            ey_z(ii,jj,kk)   = deriv1(zseg,ey3d(l,i,j,kmin:kmax),idx=idz)
+            ey_xz(ii,jj,kk)  = deriv2(xseg,zseg,ey3d(l,imin:imax,j,kmin:kmax),idx=idx,idy=idz)
+            ey_yz(ii,jj,kk)  = deriv2(yseg,zseg,ey3d(l,i,jmin:jmax,kmin:kmax),idx=idy,idy=idz)
+            ey_xyz(ii,jj,kk) = deriv3(xseg,yseg,zseg,ey3d(l,imin:imax,jmin:jmax,kmin:kmax),idx=idx,idy=idy,idz=idz)
 
             ! Derivatives of the Z-component
             ez_x(ii,jj,kk)  = deriv1(xseg,ez3d(l,imin:imax,j,k),idx=idx)
             ez_y(ii,jj,kk)  = deriv1(yseg,ez3d(l,i,jmin:jmax,k),idx=idy)
             ez_xy(ii,jj,kk) = deriv2(xseg,yseg,ez3d(l,imin:imax,jmin:jmax,k),idx=idx,idy=idy)
 
-            if(ndim==2) then ! Uniform in the z-direction
-              ez_z(ii,jj,kk)   = 0.d0
-              ez_xz(ii,jj,kk)  = 0.d0
-              ez_yz(ii,jj,kk)  = 0.d0
-              ez_xyz(ii,jj,kk) = 0.d0
-            else
-              ez_z(ii,jj,kk)   = deriv1(zseg,ez3d(l,i,j,kmin:kmax),idx=idz)
-              ez_xz(ii,jj,kk)  = deriv2(xseg,zseg,ez3d(l,imin:imax,j,kmin:kmax),idx=idx,idy=idz)
-              ez_yz(ii,jj,kk)  = deriv2(yseg,zseg,ez3d(l,i,jmin:jmax,kmin:kmax),idx=idy,idy=idz)
-              ez_xyz(ii,jj,kk) = deriv3(xseg,yseg,zseg,ez3d(l,imin:imax,jmin:jmax,kmin:kmax),idx=idx,idy=idy,idz=idz)
-            endif
+            ez_z(ii,jj,kk)   = deriv1(zseg,ez3d(l,i,j,kmin:kmax),idx=idz)
+            ez_xz(ii,jj,kk)  = deriv2(xseg,zseg,ez3d(l,imin:imax,j,kmin:kmax),idx=idx,idy=idz)
+            ez_yz(ii,jj,kk)  = deriv2(yseg,zseg,ez3d(l,i,jmin:jmax,kmin:kmax),idx=idy,idy=idz)
+            ez_xyz(ii,jj,kk) = deriv3(xseg,yseg,zseg,ez3d(l,imin:imax,jmin:jmax,kmin:kmax),idx=idx,idy=idy,idz=idz)
 
           enddo
         enddo
@@ -519,7 +466,7 @@ contains
   ! Remove parallel electric fields that were introduced by interpolation [J. Birn]
   if(present(evec) .and. norm(bvec) > thresh) then
     bhat = bvec/norm(bvec)
-    evec = evec-dot_product(evec,bhat)*bhat
+    evec = evec-dot_product(bhat,evec)*bhat
   endif
 
   return
