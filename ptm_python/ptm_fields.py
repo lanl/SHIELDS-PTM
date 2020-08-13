@@ -3,8 +3,16 @@ import itertools
 import numpy as np
 
 
-class ptm_fields_3d(object):
-    """
+class PTMfields(object):
+    """Object for storing/writing PTM fields
+
+    Example
+    -------
+    >>> pf = PTMfields()
+    >>> pf.set_grid(xgrid, ygrid, zgrid)
+    >>> pf.set_magnetic(bx, by, bz)
+    >>> pf.set_electric(ex, ey, ez)
+    >>> pf.write_file(os.path.join(directory, 'ptm_fields_{:04}.dat'.format(runid)))
     """
     def __init__(self):
         pass
@@ -72,7 +80,7 @@ def binary_to_xyz(directory, runid):
     ey = np.fromfile(os.path.join(directory, 'ey3d_{:04}.bin'.format(runid))).reshape([nx, ny, nz])
     ez = np.fromfile(os.path.join(directory, 'ez3d_{:04}.bin'.format(runid))).reshape([nx, ny, nz])
 
-    pf = ptm_fields_3d()
+    pf = PTMfields()
     pf.set_grid(xgrid, ygrid, zgrid)
     pf.set_magnetic(bx, by, bz)
     pf.set_electric(ex, ey, ez)
