@@ -1,7 +1,21 @@
+image: drsteve1663/lanlptm:1.0
+
+stages:
+  - ptmfunc
+  - ptmprec
+
 test:default:
-  image: drsteve1663/lanlptm:1.0
+  stage: ptmfunc
   script:
     - shopt -s expand_aliases
     - alias python='python3'
     - make 
     - ./ptm 1
+
+test:dipole:
+  stage: ptmprec
+  script:
+    - shopt -s expand_aliases
+    - alias python='python3'
+    - make 
+    - python ptm_python/ptm_test_data.py
