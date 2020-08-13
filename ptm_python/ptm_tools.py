@@ -6,7 +6,9 @@ Jesse Woodroffe, Steven Morley
 last revised May 2020
 """
 
+import os
 from abc import ABC, abstractmethod
+from contextlib import contextmanager
 import numpy as np
 from scipy import constants
 from scipy import special
@@ -77,6 +79,17 @@ class Proton(Particle):
     def __init__(self, energy):
         self.energy = energy
         super().__init__()
+
+
+@contextmanager
+def cd(newdir):
+    '''Context-managed chdir; changes back to original directory on exit or failure'''
+    prevdir = os.getcwd()
+    os.chdir(os.path.expanduser(newdir))
+    try:
+        yield
+    finally:
+        os.chdir(prevdir)
 
 
 def parse_trajectory_file(fname):
