@@ -33,3 +33,5 @@ if __name__ == '__main__':
             ptm_fields.binary_to_xyz(opt.input_dir, id)
         except:
             print('Conversion failed for timestep {} in {}'.format(opt.input_dir, id))
+
+    ptm_fields.tgrid_to_ascii(opt.input_dir)

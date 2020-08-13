@@ -94,3 +94,9 @@ def binary_to_xyz(directory, id):
     pf.set_magnetic(bx, by, bz)
     pf.set_electric(ex, ey, ez)
     pf.write_file(os.path.join(directory, 'ptm_fields_{:04}.dat'.format(id)))
+
+
+def tgrid_to_ascii(directory):
+    """convert PTM tgrid file to ASCII format"""
+    tgrid = np.fromfile(os.path.join(directory, 'tgrid.bin'))
+    np.savetxt(os.path.join(directory, 'tgrid.dat'), tgrid)
