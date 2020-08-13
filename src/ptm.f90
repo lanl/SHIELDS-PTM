@@ -46,15 +46,12 @@ DO n=1,nparticles
 
   call storeData(myParticle,particleData(0,:)) ! store initial conditions
 
-  iwrite = 1
-
-  do
+  do iwrite=1,nwrite
     if (mod(iwrite,360).eq.0) write (*,*) 'particle ',n,' time =',myParticle%t
     call push(myParticle,myParticle%t+sign(dtOut,real(itrace,dp)))   !  advance myParticle one dtOut (in file ptm_pars)
     call storeData(myParticle,particleData(iwrite,:))                        !  store data every output file cadence
     ! exit when finished or when problems were encountered with particle time-stepping in stepper_push
     if(.not. myParticle%integrate .or. iwrite==nwrite) exit
-    iwrite = iwrite+1
     lastepoch=myParticle%t
   enddo
 !$omp critical
@@ -62,7 +59,7 @@ DO n=1,nparticles
   ! write data files
   if(fluxMap) call writeFluxCoordinates(myParticle)
   if((.not. fluxMap) .or. itraj==1) then
-    call writeDataStore(particleData(:iwrite,:),n)
+    call writeDataStore(particleData(0:iwrite,:),n)
   end if
 
 !$omp end critical
@@ -107,7 +104,7 @@ contains
 
   implicit none
 
-  nwrite = ceiling((THi-TLo)/abs(dtOut))
+  nwrite = ceiling((THi-TLo)/abs(dtOut))+1
 
   write(*,*) "Fields Set at Time Range = ", TMin, TMax
   write(*,*) "Simulation Time Range = ", TLo, THi
