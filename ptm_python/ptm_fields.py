@@ -59,7 +59,9 @@ class PTMfields(object):
             fh.write((self.nx*'{:12.5e} ').format(*self.x).strip() + '\n')
             fh.write((self.ny*'{:12.5e} ').format(*self.y).strip() + '\n')
             fh.write((self.nz*'{:12.5e} ').format(*self.z).strip() + '\n')
-            for i, j, k in itertools.product(self.nx, self.ny, self.nz):
+            for i, j, k in itertools.product(range(self.nx),
+                                             range(self.ny),
+                                             range(self.nz)):
                 fh.write(('{:4} {:4} {:4}'+(6*' {:12.5e}')).format(i+1, j+1, k+1,
                          self.bx[i, j, k],self.by[i, j, k],self.bz[i, j, k],
                          self.ex[i, j, k],self.ey[i, j, k],self.ez[i, j, k])+'\n')
