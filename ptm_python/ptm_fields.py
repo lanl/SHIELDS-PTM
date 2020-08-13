@@ -67,23 +67,30 @@ class PTMfields(object):
                          self.ex[i, j, k],self.ey[i, j, k],self.ez[i, j, k])+'\n')
 
 
-def binary_to_xyz(directory, runid):
+def binary_to_xyz(directory, id):
     """Convert old-style binary PTM input files to new ASCII format
+
+    Parameters
+    ----------
+    directory : string
+        PTM_data directory with input files
+    id : int
+        Timestep number
     """
     xgrid = np.fromfile(os.path.join(directory, 'xgrid.bin'))
     ygrid = np.fromfile(os.path.join(directory, 'ygrid.bin'))
     zgrid = np.fromfile(os.path.join(directory, 'zgrid.bin'))
     nx, ny, nz = xgrid.size, ygrid.size, zgrid.size
 
-    bx = np.fromfile(os.path.join(directory, 'bx3d_{:04}.bin'.format(runid))).reshape([nx, ny, nz])
-    by = np.fromfile(os.path.join(directory, 'by3d_{:04}.bin'.format(runid))).reshape([nx, ny, nz])
-    bz = np.fromfile(os.path.join(directory, 'bz3d_{:04}.bin'.format(runid))).reshape([nx, ny, nz])
-    ex = np.fromfile(os.path.join(directory, 'ex3d_{:04}.bin'.format(runid))).reshape([nx, ny, nz])
-    ey = np.fromfile(os.path.join(directory, 'ey3d_{:04}.bin'.format(runid))).reshape([nx, ny, nz])
-    ez = np.fromfile(os.path.join(directory, 'ez3d_{:04}.bin'.format(runid))).reshape([nx, ny, nz])
+    bx = np.fromfile(os.path.join(directory, 'bx3d_{:04}.bin'.format(id))).reshape([nx, ny, nz])
+    by = np.fromfile(os.path.join(directory, 'by3d_{:04}.bin'.format(id))).reshape([nx, ny, nz])
+    bz = np.fromfile(os.path.join(directory, 'bz3d_{:04}.bin'.format(id))).reshape([nx, ny, nz])
+    ex = np.fromfile(os.path.join(directory, 'ex3d_{:04}.bin'.format(id))).reshape([nx, ny, nz])
+    ey = np.fromfile(os.path.join(directory, 'ey3d_{:04}.bin'.format(id))).reshape([nx, ny, nz])
+    ez = np.fromfile(os.path.join(directory, 'ez3d_{:04}.bin'.format(id))).reshape([nx, ny, nz])
 
     pf = PTMfields()
     pf.set_grid(xgrid, ygrid, zgrid)
     pf.set_magnetic(bx, by, bz)
     pf.set_electric(ex, ey, ez)
-    pf.write_file(os.path.join(directory, 'ptm_fields_{:04}.dat'.format(runid)))
+    pf.write_file(os.path.join(directory, 'ptm_fields_{:04}.dat'.format(id)))
