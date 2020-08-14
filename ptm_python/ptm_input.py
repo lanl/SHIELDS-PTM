@@ -22,31 +22,34 @@ Jesse Woodroffe
 
 """
 
-import numpy as np
 import os
+import numpy as np
+import scipy.constants as const
+
 
 class ptm_input_creator(object):
     """
     An object for creating input data files for the SHIELDS-PTM code framework
     """
 
-    __ckm = 2.99792458e5         # Speed of light in km/s
+    __ckm = const.c/1e3  # Speed of light in km/s
 
     # These are internal parameter sets which differ based on certain arguments.
 
-    __pkeys=['runid','nparticles','ndim','nx','ny','nz','itrace','ifirst','ilast','ntot','dtin','dtout',
-             'istep','iswitch','iphase','nphase','charge','mass','tlo','thi','itraj']
+    __pkeys = ['runid', 'seed', 'nparticles', 'ndim', 'itrace', 'ifirst', 'ilast', 'ntot', 'dtin', 'dtout',
+               'istep', 'iswitch', 'iphase', 'nphase', 'charge', 'mass', 'tlo', 'thi', 'itraj',
+               'ibound', 'rbound']
 
-    __dkeys=[['idens','x0','y0','z0'],
-             ['idens','xmin','xmax','ymin','ymax','zmin','zmax'],
-             ['idens','r0','mltmin','mltmax']]
+    __dkeys = [['idens', 'x0', 'y0', 'z0'],
+               ['idens', 'xmin', 'xmax', 'ymin', 'ymax', 'zmin', 'zmax'],
+               ['idens', 'r0', 'mltmin', 'mltmax']]
 
-    __vkeys=[['idist','ekev','alpha','phi'],
-             ['idist','vtperp','vtpara','phi'],
-             ['idist','nenergy','npitch','phi','emin','emax','pamin','pamax','xsource'],
-             ['idist','nenergy','npitch','phi','xsource']]
+    __vkeys = [['idist', 'ekev', 'alpha', 'phi'],
+               ['idist', 'vtperp', 'vtpara', 'phi'],
+               ['idist', 'nenergy', 'npitch', 'phi', 'emin', 'emax', 'pamin', 'pamax', 'xsource'],
+               ['idist', 'nenergy', 'npitch', 'phi', 'xsource']]
 
-    def __init__(self,runid=2,idensity=2,ivelocity=3):
+    def __init__(self, runid=2, idensity=2, ivelocity=3):
         """
         Initialize to default values for specified parameter sets
         """
@@ -57,11 +60,8 @@ class ptm_input_creator(object):
         self._descr = dict()
 
         self._pdict['runid'] = runid
+        self._pdict['seed'] = 1408      # Seed for random number generator
         self._pdict['nparticles'] = 1   # Number of particles to use in simulation
-        self._pdict['ndim'] = 3         # Number of spatial dimensions of input data (2 or 3)
-        self._pdict['nx'] = 75          # Number of points in X grid
-        self._pdict['ny'] = 75          # Number of points in Y grid
-        self._pdict['nz'] = 75          # Number of points in Z grid
         self._pdict['itrace'] = -1      # 1 = forward in time, -1 = backwards in time
         self._pdict['ifirst'] = 1       # Timestep of first fields snapshot: e.g., start at bx3d_0005.bin if ifirst=5
         self._pdict['ilast'] = 2        # Timestep of last fields snapshot: e.g., finish at bx3d_0009.bin if ilast=9
@@ -77,12 +77,11 @@ class ptm_input_creator(object):
         self._pdict['tlo'] = 0.0        # Lowest time of particle trace
         self._pdict['thi'] = 3600.0     # Highest time of particle trace
         self._pdict['itraj'] = 0        # Write particle trajectories if in flux map mode: 0 = no, 1 = yes
+        self._pdict['ibound'] = 2       # boundary mode: 2=planar source at fixed x, 3=radial bound
+        self._pdict['rbound'] = -15.0   # distance at boundary
 
+        self._descr['seed'] = 'Seed for random number generator'
         self._descr['nparticles'] = 'Number of particles to use in simulation'
-        self._descr['ndim'] = 'Number of spatial dimensions of input data (2 or 3)'
-        self._descr['nx'] = 'Number of points in X grid'
-        self._descr['ny'] = 'Number of points in Y grid'
-        self._descr['nz'] = 'Number of points in Z grid'
         self._descr['itrace'] = '1 = forward in time, -1 = backwards in time'
         self._descr['ifirst'] = 'Timestep of first fields snapshot: e.g., start at bx3d_0005.bin if ifirst=5'
         self._descr['ilast'] = 'Timestep of last fields snapshot: e.g., finish at bx3d_0009.bin if ilast=9'
@@ -101,7 +100,8 @@ class ptm_input_creator(object):
         self._descr['phi'] = 'Particle gyrophase angle in degrees; set negative to seed randomly'
         self._descr['emin'] = 'Lowest energy of flux map (keV)'
         self._descr['emax'] = 'Highest energy of flux map (keV)'
-        self._descr['xsource'] = 'XGSM distance where integration should be terminated (RE)'
+        self._descr['ibound'] = 'Boundary mode, determines shape of termination boundary'
+        self._descr['rbound'] = 'boundary distance where integration should be terminated (RE)'
 
         self._vdict['idist'] = ivelocity
 
@@ -235,50 +235,50 @@ class ptm_input_creator(object):
         if('runid' in kwargs.keys()):
             self._pdict['runid']=kwargs['runid']
 
-        pdict=self._pdict.copy()
-        ddict=self._ddict.copy()
-        vdict=self._vdict.copy()
+        pdict = self._pdict.copy()
+        ddict = self._ddict.copy()
+        vdict = self._vdict.copy()
 
         replace_D = False
         replace_V = False
 
         if('idens' in kwargs.keys()):
-            idens=kwargs['idens']
+            idens = kwargs['idens']
             replace_D = True
         else:
-            idens=ddict['idens']
+            idens = ddict['idens']
 
         if('idist' in kwargs.keys()):
-            idist=kwargs['idist']
+            idist = kwargs['idist']
             replace_V = True
         else:
-            idist=vdict['idist']
+            idist = vdict['idist']
 
         # Change parameter sets if appropriate and put back values that should not change
         if(replace_D or replace_V):
 
-            self.__init__(runid=pdict['runid'],idensity=idens,ivelocity=idist)
+            self.__init__(runid=pdict['runid'], idensity=idens, ivelocity=idist)
 
             for key,value in pdict.items():
                 if(key in self.__pkeys):
-                    self._pdict[key]=value
+                    self._pdict[key] = value
             for key,value in ddict.items():
                 if(key in self.__dkeys):
-                    self._ddict[key]=value
+                    self._ddict[key] = value
             for key,value in vdict.items():
                 if(key in self.__vkeys):
-                    self._vdict[key]=value
+                    self._vdict[key] = value
 
         # Set values from user input
         for key,value in kwargs.items():
             if(key in self.__pkeys):
-                self._pdict[key]=value
+                self._pdict[key] = value
             for dkeys in self.__dkeys:
                 if(key in dkeys):
-                    self._ddict[key]=value
+                    self._ddict[key] = value
             for vkeys in self.__vkeys:
                 if(key in vkeys):
-                    self._vdict[key]=value
+                    self._vdict[key] = value
 
         return
 
@@ -328,16 +328,14 @@ class ptm_input_creator(object):
         dfname = os.path.join(filedir, 'dist_density_{:04d}.txt'.format(self._pdict['runid']))
         vfname = os.path.join(filedir, 'dist_velocity_{:04d}.txt'.format(self._pdict['runid']))
 
-        # The [x]dfkeys lists give the name of all keys from the appropriate structure that
+        # The [x]dkeys lists give the name of all keys from the appropriate structure that
         # will be written to the corresponding output files and they provide the order
         # in which these will be written.
 
         # Write the parameter file
         with open(pfname, 'w') as pfile:
             # Set the order of parameters to be output
-            self.__pfkeys = ['runid','nparticles','ndim','nx','ny','nz','itrace','ifirst','ilast','ntot','dtin','dtout',
-                    'istep','iswitch','iphase','nphase','charge','mass','tlo','thi','itraj']
-            for key in self.__pfkeys:
+            for key in self.__pkeys:
                 try:
                     outstr = '{:<8g} {}\n'.format(self._pdict[key], key)
                 except ValueError:
@@ -349,13 +347,9 @@ class ptm_input_creator(object):
         # Write the density file, dist_density_xxxx.dat
         with open(dfname, 'w') as dfile:
             # Set the output parameters and their order based on the specified spatial distribution
-            if(  self._ddict['idens']==1):
-                dfkeys = ['idens','x0','y0','z0']
-            elif(self._ddict['idens']==2):
-                dfkeys = ['idens','xmin','xmax','ymin','ymax','zmin','zmax']
-            elif(self._ddict['idens']==3):
-                dfkeys = ['idens','r0','mltmin','mltmax']
-            else:
+            try:
+                dfkeys = self.__dkeys[self._ddict['idens']-1]
+            except (KeyError, IndexError):
                 raise Exception('Density type {:d} is not supported'.format(self._ddict['idens']))
             for key in dfkeys:
                 try:
@@ -369,15 +363,9 @@ class ptm_input_creator(object):
         # Write velocity distribution function file, dist_velocity_xxxx.dat
         with open(vfname, 'w') as vfile:
             # Set the output parameters and their order based on the specified velocity distribution
-            if(  self._vdict['idist']==1):
-                vfkeys = ['idist','ekev','alpha','phi']
-            elif(self._vdict['idist']==2):
-                vfkeys = ['idist','vtperp','vtpara','phi']
-            elif(self._vdict['idist']==3):
-                vfkeys = ['idist','nenergy','npitch','phi','emin','emax','pamin','pamax','xsource']
-            elif(self._vdict['idist']==4):
-                vfkeys = ['idist','nenergy','npitch','phi','xsource']
-            else:
+            try:
+                vfkeys = self.__vkeys[self._vdict['idist']-1]
+            except (KeyError, IndexError):
                 raise Exception('Distribution type {:d} is not supported'.format(self._vdict['idist']))
             for key in vfkeys:
                 try:
@@ -388,29 +376,23 @@ class ptm_input_creator(object):
                 vfile.write(outstr)
         if verbose: print('Wrote {0}'.format(vfname))
 
-        return
 
-    def mlt_to_phi(self,myMlt):
-
-        # Convert from magnetic local time in hours to azimuthal angle in degrees
-
+    def mlt_to_phi(self, myMlt):
+        """Convert from magnetic local time in hours to azimuthal angle in degrees"""
         if np.isscalar(myMlt):
-
-            if(myMlt < 12.0):
-                mlt=myMlt+24
+            if (myMlt < 12.0):
+                mlt = myMlt + 24
             else:
-                mlt=myMlt
-
+                mlt = myMlt
         else:
-
-            mlt=myMlt.copy()
-            mlt[mlt<12.0]+=24
-
+            mlt = myMlt.copy()
+            mlt[mlt < 12.0] += 24
         res = 15*(mlt-12.0)
 
         return res
 
-    def create_rungrid(self,times,positions,isSpherical=False):
+
+    def create_rungrid(self, times, positions, isSpherical=False):
         """
         -----------
         Description
@@ -447,34 +429,35 @@ class ptm_input_creator(object):
         # provided in whatever format is sent to this routine.
 
         if(isSpherical):
-            ph=np.deg2rad(np.array([self.mlt_to_phi(mlt) for mlt in positions[:,1]]))
-            th=np.deg2rad((90.0-positions[:,2]))
-            r=positions[:,0]*np.sin(th)**2
-            x=r*np.sin(th)*np.cos(ph)
-            y=r*np.sin(th)*np.sin(ph)
-            z=r*np.cos(th)
+            ph = np.deg2rad(np.array([self.mlt_to_phi(mlt) for mlt in positions[:, 1]]))
+            th = np.deg2rad((90.0 - positions[:, 2]))
+            r = positions[:, 0]*np.sin(th)**2
+            x = r*np.sin(th)*np.cos(ph)
+            y = r*np.sin(th)*np.sin(ph)
+            z = r*np.cos(th)
         else:
-            x=np.array(positions[:,0])
-            y=np.array(positions[:,1])
-            z=np.array(positions[:,2])
+            x = np.array(positions[:, 0])
+            y = np.array(positions[:, 1])
+            z = np.array(positions[:, 2])
 
-        tstart = np.array(times[:,0])
-        tstop = np.array(times[:,1])
+        tstart = np.array(times[:, 0])
+        tstop = np.array(times[:, 1])
 
-        with open('rungrid.txt','w') as f:
-            myid=0
-            f.write('{:<8}{:<8}{:<8}{:<8}{:<8}{:<8}\n'.format('RunID','tLo','tHi','x0','y0','z0'))
+        with open('rungrid.txt', 'w') as f:
+            myid = 0
+            f.write('{:<8}{:<8}{:<8}{:<8}{:<8}{:<8}\n'.format('RunID', 'tLo', 'tHi', 'x0', 'y0', 'z0'))
             for i in range(tstart.size):
                 for j in range(x.size):
-                    myid+=1
-                    f.write('{:<8}{:<8.1f}{:<8.1f}{:<8.3f}{:<8.3f}{:<8.3f}\n'.format(myid,tstart[i],tstop[i],positions[j,0],positions[j,1],positions[j,2]))
-                    self.set_parameters(runid=myid,x0=x[j],y0=y[j],z0=z[j],tlo=tstart[i],thi=tstop[i])
+                    myid += 1
+                    f.write('{:<8}{:<8.1f}{:<8.1f}{:<8.3f}{:<8.3f}{:<8.3f}\n'
+                            .format(myid, tstart[i], tstop[i],
+                                    positions[j, 0], positions[j, 1], positions[j, 2]))
+                    self.set_parameters(runid=myid, x0=x[j], y0=y[j], z0=z[j],
+                                        tlo=tstart[i], thi=tstop[i])
                     self.create_input_files()
 
-        return
 
 if __name__ == "__main__":
-
     """
     This is an example routine that creates a default input object and uses it to make a rungrid
     """
