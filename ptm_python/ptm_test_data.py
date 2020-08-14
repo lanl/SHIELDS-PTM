@@ -3,7 +3,7 @@ import numpy as np
 from scipy import interpolate, linalg
 from matplotlib import pyplot as plt
 import ptm_dipole
-import ptm_fields
+import ptm_preprocessing
 import ptm_drift
 import ptm_tools
 
@@ -58,7 +58,7 @@ def make_test_data():
     ey = np.zeros_like(ex)
     ez = np.zeros_like(ex)
 
-    pf = ptm_fields.PTMfields()
+    pf = ptm_preprocessing.PTMfields()
     pf.set_grid(xgrid, ygrid, zgrid)
     pf.set_magnetic(bdip[:,:,:,0], bdip[:,:,:,1], bdip[:,:,:,2])
     pf.set_electric(ex, ey, ez)
