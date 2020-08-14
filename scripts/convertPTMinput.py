@@ -3,7 +3,7 @@ import re
 import glob
 import argparse
 
-from ptm_python import ptm_fields
+from ptm_python import ptm_preprocessing
 
 
 if __name__ == '__main__':
@@ -30,8 +30,8 @@ if __name__ == '__main__':
 
     for id in stepids:
         try:
-            ptm_fields.binary_to_xyz(opt.input_dir, id)
+            ptm_preprocessing.binary_to_xyz(opt.input_dir, id)
         except:
             print('Conversion failed for timestep {} in {}'.format(opt.input_dir, id))
 
-    ptm_fields.tgrid_to_ascii(opt.input_dir)
+    ptm_preprocessing.tgrid_to_ascii(opt.input_dir)
