@@ -1,19 +1,20 @@
-PTM - The SHIELDS Particle Tracing Model
+# PTM - The SHIELDS Particle Tracing Model
 
-Jesse Woodroffe [1]
-Steven Morley [1]
-Thiago Brito [1]
-Alin-Daniel Panaitescu [2]
-Michael Henderson [1]
-Vania Jordanova [1]
+### Authors and Contributors
+Jesse Woodroffe [1], Steven Morley [1], Thiago Brito [1], Alin-Daniel Panaitescu [2], Michael Henderson [1], Vania Jordanova [1]
 
-[1] Los Alamos National Laboratory
-    ISR-1, Space Science & Applications
-[2] Los Alamos National Laboratory
-    ISR-2, Space and Remote Sensing
+1. ISR-1, Space Science & Applications, Los Alamos National Laboratory
+2. ISR-2, Space and Remote Sensing, Los Alamos National Laboratory
 
----
+### About the code
+This directory contains the simulation code and analysis tools for the SHIELDS particle tracing model (PTM).
 
-This directory contains the simulation code and analysis tools for the SHIELDS particle tracing model.
+The main source is written in Fortran2008. Associated scripts, pre-processing, and post-processing are written in Python 3.
 
-See individual files for specific documentation.
+To build PTM, simply run:
+```
+make
+```
+
+To build the fortran only run `make ptm`, to build/install the Python module only run `make python`, and to convert the Markdown documents to PDF use `make docs`.
+The documentation conversion uses the Node.js `mdpdf` module, which can be installed using `npm install mdpdf -g`. PDF documentation is placed in the `docs` directory.
