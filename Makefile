@@ -41,3 +41,16 @@ clean-ptm:
 clean-python:
 	rm -f ptm_python/*.pyc
 	rm -rf ptm_python/__pycache__
+	rm -rf build/
+	rm -rf dist/
+
+# Build docs in PDF. Uses mdpdf (a Node.js module)
+docs:
+	mdpdf PTM_HowToRun.md
+	mdpdf README.md
+	[ -d docs ] || mkdir docs/
+	mv PTM_HowToRun.pdf docs/
+	mv README.pdf docs/
+
+clean-docs:
+	rm -rf docs
