@@ -158,7 +158,7 @@ contains
     write(*,*) repeat('-',nrep)
     write(*,*)
 
-    stop
+    error stop 1
 
   endif
 
