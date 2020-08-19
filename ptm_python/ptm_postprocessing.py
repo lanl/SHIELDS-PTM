@@ -420,7 +420,7 @@ class ptm_postprocessor(object):
         return results
 
 
-    def test_distributions(self):
+    def test_distributions(self, verbose=True):
         """
         Check valididty of distribution functions.
         """
@@ -430,81 +430,92 @@ class ptm_postprocessor(object):
         # mathematics. The other versions yield the same results when momentum is converted to kinetic energy
 
         # Store current parameters
-        params = {'energy':self.__ec,'density':self.__n,'mass':self.__mc2/self.__elec_restmass,'source':self.source_type}
+        params = {'energy': self.__ec, 'density': self.__n, 'mass': self.__mc2/self.__elec_restmass,
+                  'source': self.source_type}
 
         # Check if we're currently in the kappa family, and if so remember to store kappa as well
         if hasattr(self,'_ptm_postprocessor__kappa'):
             params['kappa'] = self.__kappa
 
         c3 = self.__ckm**3
+        test_speed = 0.1  # Normalized momentum p/mc
+        test_momentum = 0.1  # Normalized momentum p/mc
 
         # Maxwell distribution
         # Integrate to show proper normalization
         self.set_source('maxwell')
-        res0=integrate.quad(lambda x:4*np.pi*c3*x*x*self.__dist_maxwell_u(x),0,np.inf)[0]/self.__n
+        res0=integrate.quad(lambda x: 4*np.pi*c3*x*x*self.__dist_maxwell_u(x), 0, np.inf)[0]/self.__n
 
         # Show equivalence between distributions
-        test_speed=0.1 #Normalized momentum p/mc
         energy = (1/2)*self.__mc2*(test_speed**2)
         m1,m2 = self.get_dist_u(test_speed), self.get_dist(energy)
 
         #Maxwell-Juttner distribution
         # Integrate to show proper normalization
         self.set_source('juttner')
-        res1=integrate.quad(lambda x:4*np.pi*c3*x*x*self.__dist_juttner_u(x),0,np.inf)[0]/self.__n
+        res1 = integrate.quad(lambda x: 4*np.pi*c3*x*x*self.__dist_juttner_u(x), 0, np.inf)[0]/self.__n
 
         # Show equivalence between distributions
-        test_momentum=0.1 #Normalized momentum p/mc
-        gamma=np.sqrt(1+test_momentum**2)
-        energy=(gamma-1)*self.__mc2 # E = (gamma-1)*mc^2
+        gamma = np.sqrt(1 + test_momentum**2)
+        energy = (gamma-1)*self.__mc2  # E = (gamma-1)*mc^2
         j1,j2 = self.get_dist_u(test_momentum), self.get_dist(energy)
 
         # Integrate Kappa distribution
         self.set_source('kappa')
-        res2=integrate.quad(lambda x:4*np.pi*c3*x*x*self.__dist_kappa_u(x),0,np.inf)[0]/self.__n
+        res2 = integrate.quad(lambda x: 4*np.pi*c3*x*x*self.__dist_kappa_u(x), 0, np.inf)[0]/self.__n
 
         # Show equivalence between distributions using energy and velocity inputs
-        test_speed=0.1 #Fraction of light speed
-        energy=(1/2)*self.__mc2*test_speed**2 # E = (1/2)(mc^2)*(v/c)**2
+        test_speed = 0.1  # Fraction of light speed
+        energy = (1/2)*self.__mc2*test_speed**2 # E = (1/2)(mc^2)*(v/c)**2
         k1,k2 = self.get_dist_u(test_speed),self.get_dist(energy)
 
         # Integrate relativistic Kappa distribution
         self.set_source('kaprel')
-        res3=integrate.quad(lambda x:4*np.pi*c3*x*x*self.__dist_kaprel_u(x),0,np.inf)[0]/self.__n
+        res3 = integrate.quad(lambda x:4*np.pi*c3*x*x*self.__dist_kaprel_u(x),0,np.inf)[0]/self.__n
 
-        gamma=np.sqrt(1+test_momentum**2)
-        energy=(gamma-1)*self.__mc2 # E = (gamma-1)*mc^2
+        gamma = np.sqrt(1+test_momentum**2)
+        energy = (gamma-1)*self.__mc2  # E = (gamma-1)*mc^2
 
         r1,r2 = self.get_dist_u(test_momentum),self.get_dist(energy)
 
-        print('USING DEFAULT ARGUMENTS\n')
+        resdict = {'Maxwell': (m1, m2, res0),
+                   'Juttner': (j1, j2, res1),
+                   'Kappa': (k1, k2, res2),
+                   'relKT': (r1, r2, res3),
+                   }
 
-        print('Maxwell Distribution:')
-        print('Compare f(u) and f(E) (should be same):')
-        print('{:}\t{:}'.format(m1,m2))
-        print('Integral of distribution function (should be 1):')
-        print('{:}\n'.format(res0))
+        if verbose:
+            print('USING DEFAULT ARGUMENTS\n')
 
-        print('Juttner Distribution:')
-        print('Compare f(u) and f(E) (should be same):')
-        print('{:}\t{:}'.format(j1,j2))
-        print('Integral of distribution function (should be 1):')
-        print('{:}\n'.format(res1))
+            print('Maxwell Distribution:')
+            print('Compare f(u) and f(E) (should be same):')
+            print('{:}\t{:}'.format(m1, m2))
+            print('Integral of distribution function (should be 1):')
+            print('{:}\n'.format(res0))
 
-        print('Kappa Distribution:')
-        print('Compare f(v) and f(E) (should be same):')
-        print('{:}\t{:}'.format(k1,k2))
-        print('Integral of distribution function (should be 1):')
-        print('{:}\n'.format(res2))
+            print('Juttner Distribution:')
+            print('Compare f(u) and f(E) (should be same):')
+            print('{:}\t{:}'.format(j1, j2))
+            print('Integral of distribution function (should be 1):')
+            print('{:}\n'.format(res1))
 
-        print('Relativisitc Kappa Distribution:')
-        print('Compare f(u) and f(E) (should be same):')
-        print('{:}\t{:}'.format(r1,r2))
-        print('Integral of distribution function (should be 1):')
-        print('{:}\n'.format(res3))
+            print('Kappa Distribution:')
+            print('Compare f(v) and f(E) (should be same):')
+            print('{:}\t{:}'.format(k1, k2))
+            print('Integral of distribution function (should be 1):')
+            print('{:}\n'.format(res2))
+
+            print('Relativisitc Kappa Distribution:')
+            print('Compare f(u) and f(E) (should be same):')
+            print('{:}\t{:}'.format(r1, r2))
+            print('Integral of distribution function (should be 1):')
+            print('{:}\n'.format(res3))
 
         # Return to the original source type
         self.set_source(params['source'], params)
+
+        # Return data for automated testing
+        return resdict
 
 
     def test_omni(self):

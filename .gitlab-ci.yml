@@ -19,3 +19,11 @@ test:dipole:
     - alias python='python3'
     - make 
     - python ptm_python/ptm_test_data.py
+
+test:python:
+  stage: ptmfunc
+  script:
+    - shopt -s expand_aliases
+    - alias python='python3'
+    - make python
+    - python ptm_python/test_ptm.py
