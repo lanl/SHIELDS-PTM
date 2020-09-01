@@ -87,6 +87,46 @@ class PTMfields(object):
                          self.bx[i, j, k],self.by[i, j, k],self.bz[i, j, k],
                          self.ex[i, j, k],self.ey[i, j, k],self.ez[i, j, k])+'\n')
 
+    @classmethod
+    def from_file(cls, filename):
+        """Read PTM input format file
+        """
+        with open(filename, 'r') as fh:
+            dims = fh.readline().strip().split()
+            xvals = fh.readline().strip().split()
+            yvals = fh.readline().strip().split()
+            zvals = fh.readline().strip().split()
+            datalines = fh.readlines()
+
+        newobj = cls()
+        # dimensions
+        dims = [int(v) for v in dims]
+        newobj.nx, newobj.ny, newobj.nz = dims
+        newobj.x = np.array(xvals).astype(float)
+        newobj.y = np.array(yvals).astype(float)
+        newobj.z = np.array(zvals).astype(float)
+
+        newobj.bx = np.empty((newobj.nx, newobj.ny, newobj.nz))
+        newobj.by = np.empty((newobj.nx, newobj.ny, newobj.nz))
+        newobj.bz = np.empty((newobj.nx, newobj.ny, newobj.nz))
+        newobj.ex = np.empty((newobj.nx, newobj.ny, newobj.nz))
+        newobj.ey = np.empty((newobj.nx, newobj.ny, newobj.nz))
+        newobj.ez = np.empty((newobj.nx, newobj.ny, newobj.nz))
+
+        #now populate (bx, by, bz) and (ex, ey, ez)
+        for line in datalines:
+            vals = line.strip().split()
+            i, j, k = int(vals[0])-1, int(vals[1])-1, int(vals[2])-1
+            b_e = [float(v) for v in vals[3:]]
+            newobj.bx[i, j, k] = b_e[0]
+            newobj.by[i, j, k] = b_e[1]
+            newobj.bz[i, j, k] = b_e[2]
+            newobj.ex[i, j, k] = b_e[3]
+            newobj.ey[i, j, k] = b_e[4]
+            newobj.ez[i, j, k] = b_e[5]
+
+        return newobj
+
 
 def binary_to_xyz(directory, id):
     """Convert old-style binary PTM input files to new ASCII format
