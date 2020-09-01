@@ -88,7 +88,7 @@ class PTMfields(object):
                          self.ex[i, j, k],self.ey[i, j, k],self.ez[i, j, k])+'\n')
 
     @classmethod
-    def from_file(cls, filename):
+    def from_file(cls, filename, dims_only=False):
         """Read PTM input format file
         """
         with open(filename, 'r') as fh:
@@ -96,7 +96,8 @@ class PTMfields(object):
             xvals = fh.readline().strip().split()
             yvals = fh.readline().strip().split()
             zvals = fh.readline().strip().split()
-            datalines = fh.readlines()
+            if not dims_only:
+                datalines = fh.readlines()
 
         newobj = cls()
         # dimensions
@@ -106,6 +107,10 @@ class PTMfields(object):
         newobj.y = np.array(yvals).astype(float)
         newobj.z = np.array(zvals).astype(float)
 
+        if dims_only:
+            return newobj
+
+        # set up b and e arrays
         newobj.bx = np.empty((newobj.nx, newobj.ny, newobj.nz))
         newobj.by = np.empty((newobj.nx, newobj.ny, newobj.nz))
         newobj.bz = np.empty((newobj.nx, newobj.ny, newobj.nz))
