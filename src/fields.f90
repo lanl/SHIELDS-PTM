@@ -32,9 +32,8 @@ contains
   ! Read temporal and spatial grids
 
   call read_grid('ptm_data/tgrid.dat',tgrid)
-  ifirst = maxval(maxloc(tgrid,tgrid<=tlo))
-  ilast = maxval(maxloc(tgrid,tgrid>=thi))
-  nt = ilast-ifirst+1
+  ! Set ifirst, ilast, ntot from params.
+  ! Should check for consistency with tgrid
   TMin = tgrid(ifirst)
   TMax = tgrid(ilast)
 
@@ -59,7 +58,7 @@ contains
   write(*,*) tmin, " <= T <= ", tmax
 
   ! Allocate storage for electromagnetic fields
-  allocate(BX3D(nt,nx,ny,nz))
+  allocate(BX3D(ntot,nx,ny,nz))
   allocate(BY3D,BZ3D,EX3D,EY3D,EZ3D,mold=BX3D)
 
   ! Get electromagnetic fields
