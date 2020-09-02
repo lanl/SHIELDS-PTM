@@ -25,7 +25,7 @@ def calculate_omni(fluxmap, fov=False, initialE=False):
     if not initialE:
         nener, nalph = diff_flux.shape
         for idx, jdx in it.product(range(nener), range(nalph)):
-            if (np.abs(fluxmap['final_x'][idx, jdx]) >= 15).any():
+            if np.linalg.norm(fluxmap['final_x'][idx, jdx]) >= 14.99:
                 continue
             else:
                 diff_flux[idx, jdx] = 0.
@@ -73,7 +73,7 @@ def cutoffs(fluxmap, addTo=None, **kwargs):
         allow = np.array([True if (np.abs(fluxmap['final_x'][n])==15).any()
                           else False for n in range(len(fluxmap['energies']))])
     else:  # fractional
-        allow = np.array([np.sum(np.abs(fluxmap['final_x'][n])==15)
+        allow = np.array([np.sum(np.linalg.norm(fluxmap['final_x'][n], axis=-1) >= 14.99)
                           for n in range(len(fluxmap['energies']))], dtype=np.float)
         allow /= len(fluxmap['angles'])
 
@@ -90,7 +90,10 @@ def cutoffs(fluxmap, addTo=None, **kwargs):
     print('Ec_low = {}'.format(ec_low))
     # upper cutoff is where all values are "full" transmission
     # Here "full" accounts for solid angle of Earth
-    idx_high = find_runs(full_access)[-1][0]
+    try:
+        idx_high = find_runs(full_access)[-1][0]
+    except IndexError:
+        idx_high = -1
     ec_high = en_mev[idx_high]
     print('Ec_high = {}'.format(ec_high))
     prot_low = ptt.Proton(ec_low)
