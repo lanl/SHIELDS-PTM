@@ -127,8 +127,8 @@ contains
 
       allocate(pitchAngles(abs(nPitchAngles)))
       allocate(energies(abs(nEnergies)))
-      call read_array('ptm_data/energies.bin',energies)
-      call read_array('ptm_data/pitchangles.bin',pitchAngles)
+      call read_array('ptm_data/energies_'//id_string//'.bin',energies)
+      call read_array('ptm_data/pitchangles_'//id_string//'.bin',pitchAngles)
 
     case default
 
