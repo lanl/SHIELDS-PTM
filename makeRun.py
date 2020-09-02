@@ -97,8 +97,9 @@ def setupGPS(opt, runid, nruns, verbose=False):
                              ilast=stepN,  # number of last time
                              ntot=len(tgrid),  # number of steps
                              charge=1.0, mass=1837.0,  # protons
-                             dtout=0.1, # 0.1s output written
-                             thi=opt.starttime, # max time ("start" for backwards trace)
+                             dtin=opt.timestep,  # set delta between fields snapshots
+                             dtout=0.1,  # 0.1s output written
+                             thi=opt.starttime,  # max time ("start" for backwards trace)
                              tlo=opt.starttime-300,  # min time ("end" for backwards trace)
                              itraj=1,  # 1=write trajectories when in fluxmap mode
                              ibound=3,  # 3=radial distance stopping criterion
@@ -160,6 +161,7 @@ def setupElec(opt, runid, nruns, verbose=False):
         setup.set_parameters(iswitch=0,  # switch between GC and full orbit
                              itrace=-1,  # backwards in time
                              charge=-1.0, mass=1.0,  # electrons
+                             dtin=opt.timestep,  # set delta between fields snapshots
                              dtout=1.0, # 0.1s output written
                              thi=600.0, # max time of 600s
                              itraj=1,  # 1=write trajectories when in fluxmap mode
