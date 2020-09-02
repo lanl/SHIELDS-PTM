@@ -3,7 +3,9 @@
 SHIELDS-PTM run setup script for SEP access
 """
 import argparse
+import glob
 import os
+import re
 import subprocess
 from contextlib import contextmanager
 import numpy as np
@@ -23,13 +25,15 @@ def cd(newdir):
 
 
 def setupGPS(opt, runid, nruns, verbose=False):
-    # Get size of grid
     indir = os.path.join(opt.input_dir, 'ptm_data')
-    # TODO: test for presence of directory and files, if not there, error
-    xs = np.fromfile(os.path.join(indir, 'xgrid.bin'))
-    ys = np.fromfile(os.path.join(indir, 'ygrid.bin'))
-    zs = np.fromfile(os.path.join(indir, 'zgrid.bin'))
-
+    # get timesteps available in ptm_data directory
+    gterm = os.path.join(indir, 'ptm_fields*dat')
+    cands = glob.glob(gterm)
+    cands = [re.search('(\d{4})', cc) for cc in cands]
+    cands = [int(cc.group()) for cc in cands]
+    step1 = min(cands)
+    stepN = max(cands)
+    tgrid = np.loadtxt(os.path.join(indir, 'tgrid.dat'))
     # break energy & alpha space over number of runs...
     emin = 5.0*1e3  # 5MeV lower limit
     emax = 800.0*1e3  # 800MeV upper limit
@@ -75,12 +79,6 @@ def setupGPS(opt, runid, nruns, verbose=False):
                                             idensity=1,  # Point source
                                             )
 
-        # Ensure domain resolution is correctly set
-        setup.set_parameters(ndim=3,
-                             nx=xs.shape[0],
-                             ny=ys.shape[0],
-                             nz=zs.shape[0])
-
         # Change to user-defined flux map mode
         setup.set_parameters(idist=4)
         # Break up into multiple "runs"? For efficiency I should
@@ -95,11 +93,16 @@ def setupGPS(opt, runid, nruns, verbose=False):
         # Set proton tracing params, incl. full orbit
         setup.set_parameters(iswitch=1,  # full orbit
                              itrace=-1,  # backwards in time
+                             ifirst=step1,  # number of first time
+                             ilast=stepN,  # number of last time
+                             ntot=len(tgrid),  # number of steps
                              charge=1.0, mass=1837.0,  # protons
                              dtout=0.1, # 0.1s output written
                              thi=opt.starttime, # max time ("start" for backwards trace)
                              tlo=opt.starttime-300,  # min time ("end" for backwards trace)
                              itraj=1,  # 1=write trajectories when in fluxmap mode
+                             ibound=3,  # 3=radial distance stopping criterion
+                             rbound=15.0,  # distance to stopping surface
                              )
 
         # Define point source for tracing
@@ -116,13 +119,6 @@ def setupGPS(opt, runid, nruns, verbose=False):
 
 
 def setupElec(opt, runid, nruns, verbose=False):
-    # Get size of grid
-    indir = os.path.join(opt.input_dir, 'ptm_data')
-    # TODO: test for presence of directory and files, if not there, error
-    xs = np.fromfile(os.path.join(indir, 'xgrid.bin'))
-    ys = np.fromfile(os.path.join(indir, 'ygrid.bin'))
-    zs = np.fromfile(os.path.join(indir, 'zgrid.bin'))
-
     # break energy space over number of runs...
     emin = 50.0*1e-3  # 50eV lower limit
     emax = 200.0*1e-3  # 200eV upper limit
@@ -142,12 +138,6 @@ def setupElec(opt, runid, nruns, verbose=False):
         setup = ptm_input.ptm_input_creator(runid=runid+runno,
                                             idensity=1,  # Point source
                                             )
-
-        # Ensure domain resolution is correctly set
-        setup.set_parameters(ndim=3,
-                             nx=xs.shape[0],
-                             ny=ys.shape[0],
-                             nz=zs.shape[0])
 
         # Change to flux map mode
         setup.set_parameters(idist=3)  # TODO: can I get particle 
@@ -173,6 +163,8 @@ def setupElec(opt, runid, nruns, verbose=False):
                              dtout=1.0, # 0.1s output written
                              thi=600.0, # max time of 600s
                              itraj=1,  # 1=write trajectories when in fluxmap mode
+                             ibound=2,  # 2=plane at fixed X
+                             rbound=-15.0,  # distance to stopping surface
                              )
 
         # Define point source for tracing

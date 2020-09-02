@@ -35,7 +35,6 @@ class ptm_input_creator(object):
     __ckm = const.c/1e3  # Speed of light in km/s
 
     # These are internal parameter sets which differ based on certain arguments.
-
     __pkeys = ['runid', 'seed', 'nparticles', 'ndim', 'itrace', 'ifirst', 'ilast', 'ntot', 'dtin', 'dtout',
                'istep', 'iswitch', 'iphase', 'nphase', 'charge', 'mass', 'tlo', 'thi', 'itraj',
                'ibound', 'rbound']
@@ -62,6 +61,7 @@ class ptm_input_creator(object):
         self._pdict['runid'] = runid
         self._pdict['seed'] = 1408      # Seed for random number generator
         self._pdict['nparticles'] = 1   # Number of particles to use in simulation
+        self._pdict['ndim'] = 3         # Number of dimensions (==3)
         self._pdict['itrace'] = -1      # 1 = forward in time, -1 = backwards in time
         self._pdict['ifirst'] = 1       # Timestep of first fields snapshot: e.g., start at bx3d_0005.bin if ifirst=5
         self._pdict['ilast'] = 2        # Timestep of last fields snapshot: e.g., finish at bx3d_0009.bin if ilast=9
@@ -82,6 +82,7 @@ class ptm_input_creator(object):
 
         self._descr['seed'] = 'Seed for random number generator'
         self._descr['nparticles'] = 'Number of particles to use in simulation'
+        self._descr['ndim'] = 'Number of dimensions (2 or 3, 3 is default)'
         self._descr['itrace'] = '1 = forward in time, -1 = backwards in time'
         self._descr['ifirst'] = 'Timestep of first fields snapshot: e.g., start at bx3d_0005.bin if ifirst=5'
         self._descr['ilast'] = 'Timestep of last fields snapshot: e.g., finish at bx3d_0009.bin if ilast=9'
@@ -159,6 +160,31 @@ class ptm_input_creator(object):
             self._ddict['r0'] = 6.6       # Radial distance for seeding (RE)
             self._ddict['mltmin'] = -6.0  # Minimum local time for seeding region (HOURS)
             self._ddict['mltmax'] = 6.0   # Maximum local time for seeding region (HOURS)
+
+
+    @classmethod
+    def from_file(cls, param=None, vel=None, dens=None, fmt='legacy'):
+        """Make a ptm_input_creator object from existing files
+        """
+        setupdict = dict()
+        newobj = cls(**setupdict)
+        if param is not None:
+            if fmt == 'legacy':
+                pardict = read_legacy_params(param)
+            else:
+                raise NotImplementedError
+            newobj.set_parameters(**pardict)
+        if vel is not None:
+            raise NotImplementedError
+            veldict = read_vel_file(vel)
+            newobj.set_parameters(**veldict)
+        if dens is not None:
+            raise NotImplementedError
+            densdict = read_dens_file(dens)
+            newobj.set_parameters(**densdict)
+
+        return newobj
+
 
     def get_interactive_input(self):
         """
@@ -280,7 +306,6 @@ class ptm_input_creator(object):
                 if(key in vkeys):
                     self._vdict[key] = value
 
-        return
 
     def print_settings(self):
         """
@@ -305,9 +330,9 @@ class ptm_input_creator(object):
         for key in self.__vkeys[self._vdict['idist']-1]:
             print('{:<12}{:>8}'.format(key, self._vdict[key]))
 
-        return
 
-    def create_input_files(self, filedir='ptm_input', verbose=False):
+    def create_input_files(self, filedir='ptm_input', verbose=False,
+                           writeparam=True, writevel=True, writedens=True):
         """
         Write the output files
         """
@@ -332,49 +357,52 @@ class ptm_input_creator(object):
         # will be written to the corresponding output files and they provide the order
         # in which these will be written.
 
-        # Write the parameter file
-        with open(pfname, 'w') as pfile:
-            # Set the order of parameters to be output
-            for key in self.__pkeys:
-                try:
-                    outstr = '{:<8g} {}\n'.format(self._pdict[key], key)
-                except ValueError:
-                    val = float(self._pdict[key])
-                    outstr = '{:<8g} {}\n'.format(val, key)
-                pfile.write(outstr)
-        if verbose: print('Wrote {0}'.format(pfname))
+        # Write the parameter filea
+        if writeparam:
+            with open(pfname, 'w') as pfile:
+                # Set the order of parameters to be output
+                for key in self.__pkeys:
+                    try:
+                        outstr = '{:<8g} {}\n'.format(self._pdict[key], key)
+                    except ValueError:
+                        val = float(self._pdict[key])
+                        outstr = '{:<8g} {}\n'.format(val, key)
+                    pfile.write(outstr)
+            if verbose: print('Wrote {0}'.format(pfname))
 
         # Write the density file, dist_density_xxxx.dat
-        with open(dfname, 'w') as dfile:
-            # Set the output parameters and their order based on the specified spatial distribution
-            try:
-                dfkeys = self.__dkeys[self._ddict['idens']-1]
-            except (KeyError, IndexError):
-                raise Exception('Density type {:d} is not supported'.format(self._ddict['idens']))
-            for key in dfkeys:
+        if writedens:
+            with open(dfname, 'w') as dfile:
+                # Set the output parameters and their order based on the specified spatial distribution
                 try:
-                    outstr = '{:<8g} {}\n'.format(self._ddict[key], key)
-                except ValueError:
-                    val = float(self._ddict[key])
-                    outstr = '{:<8g} {}\n'.format(val, key)
-                dfile.write(outstr)
-        if verbose: print('Wrote {0}'.format(dfname))
+                    dfkeys = self.__dkeys[self._ddict['idens']-1]
+                except (KeyError, IndexError):
+                    raise Exception('Density type {:d} is not supported'.format(self._ddict['idens']))
+                for key in dfkeys:
+                    try:
+                        outstr = '{:<8g} {}\n'.format(self._ddict[key], key)
+                    except ValueError:
+                        val = float(self._ddict[key])
+                        outstr = '{:<8g} {}\n'.format(val, key)
+                    dfile.write(outstr)
+            if verbose: print('Wrote {0}'.format(dfname))
 
         # Write velocity distribution function file, dist_velocity_xxxx.dat
-        with open(vfname, 'w') as vfile:
-            # Set the output parameters and their order based on the specified velocity distribution
-            try:
-                vfkeys = self.__vkeys[self._vdict['idist']-1]
-            except (KeyError, IndexError):
-                raise Exception('Distribution type {:d} is not supported'.format(self._vdict['idist']))
-            for key in vfkeys:
+        if writevel:
+            with open(vfname, 'w') as vfile:
+                # Set the output parameters and their order based on the specified velocity distribution
                 try:
-                    outstr = '{:<8g} {}\n'.format(self._vdict[key], key)
-                except ValueError:
-                    val = float(self._vdict[key])
-                    outstr = '{:<8g} {}\n'.format(val, key)
-                vfile.write(outstr)
-        if verbose: print('Wrote {0}'.format(vfname))
+                    vfkeys = self.__vkeys[self._vdict['idist']-1]
+                except (KeyError, IndexError):
+                    raise Exception('Distribution type {:d} is not supported'.format(self._vdict['idist']))
+                for key in vfkeys:
+                    try:
+                        outstr = '{:<8g} {}\n'.format(self._vdict[key], key)
+                    except ValueError:
+                        val = float(self._vdict[key])
+                        outstr = '{:<8g} {}\n'.format(val, key)
+                    vfile.write(outstr)
+            if verbose: print('Wrote {0}'.format(vfname))
 
 
     def mlt_to_phi(self, myMlt):
@@ -455,6 +483,25 @@ class ptm_input_creator(object):
                     self.set_parameters(runid=myid, x0=x[j], y0=y[j], z0=z[j],
                                         tlo=tstart[i], thi=tstop[i])
                     self.create_input_files()
+
+
+
+def read_legacy_params(fname):
+    #TODO: need to also grab vel and dens files and populate
+    with open(fname) as fh:
+        body = fh.readlines()
+
+    bodyval = [line.strip().split()[0] for line in body]
+    if 'npart' not in body[1]:
+        raise ValueError('Cannot determine whether input file is new or legacy')
+
+    paramkeys = ['runid', 'nparticles', 'ndim', 'nx', 'ny', 'nz', 'itrace', 'ifirst', 'ilast',
+                 'ntot', 'dtin', 'dtout', 'istep', 'iswitch', 'iphase', 'nphase', 'charge',
+                 'mass', 'tlo', 'thi', 'itraj']
+
+    paramdict = {key: val for key, val in zip(paramkeys, bodyval)}
+    return paramdict
+
 
 
 if __name__ == "__main__":
