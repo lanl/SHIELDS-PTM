@@ -41,13 +41,13 @@ def plot_omni(omni, fluxmap):
     fig = plt.figure()
     ax0 = fig.add_axes([0.15, 0.2, 0.78, 0.6])
     en_mev = fluxmap['energies']/1e3
-    ax0.loglog(en_mev, omni*1e3)
+    ax0.loglog(en_mev, omni*1e3, label='Omni')
     enlo, enhi = en_mev[0], en_mev[-1]
     ax0.set_xlabel('Energy [MeV]')
     ax0.set_ylabel('Diff. Flux [per MeV]')
     ax0.set_title(fluxmap.attrs['position'])
 
-    cdict, allow = cutoffs(fluxmap, addTo=ax0, linestyle='--', color='b', label_pre='Omni')
+    cdict, allow = cutoffs(fluxmap, addTo=ax0, linestyle='--', color='b')
     #ax0.axvline(x=cdict['ec_low'], linestyle=':', color='k',
     #            label='E$_{c}^{low}$ = ' + '{0:.2f} MeV'.format(cdict['ec_low']))
     #ax0.axvline(x=cdict['ec_high'], linestyle=':', color='k',
@@ -164,6 +164,7 @@ if __name__ == '__main__':
     fluxmap_1 = copy.deepcopy(fluxmap)
     fluxmap_2 = copy.deepcopy(fluxmap)
     omni = calculate_omni(fluxmap)
+    cdict, allow = cutoffs(fluxmap, addTo=None)
     omni1 = calculate_omni(fluxmap_1, fov=True)
     fig, axes = plot_omni(omni, fluxmap)
     omni2 = calculate_omni(fluxmap_2, initialE=True)
@@ -171,4 +172,8 @@ if __name__ == '__main__':
     #cdict1, allow1 = cutoffs(fluxmap_1, addTo=axes[0], linestyle='--', color='orange')
     add_extra_omni(axes[0], omni2, fluxmap_2, label='Initial', color='green')
     axes[0].legend()
+    ylims = axes[0].get_ylim()
+    axes[0].plot(cdict['ec_low'], ylims[0], marker='^', mec='k', mfc='silver', clip_on=False)
+    axes[0].plot(cdict['ec_high'], ylims[0], marker='^', mec='k', mfc='grey', clip_on=False)
+    axes[0].set_ylim(ylims)
     plt.show()
