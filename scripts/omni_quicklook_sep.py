@@ -11,31 +11,52 @@ import matplotlib.pyplot as plt
 from ptm_python import ptm_tools as ptt
 from ptm_python import ptm_postprocessing as post
 
-def calculate_omni(fluxmap, fov=False, initialE=False):
-    pp = post.ptm_postprocessor()
 
-    pp.set_source(source_type='kaprel', params=dict(density=5e-6, energy=752.0, kappa=5.0, mass=1847.0))
-    # n_dens      float       optional, number density at source region in cm-3
-    # e_char      float       optional, characteristic energy of distribution in keV
-    # kappa       float       optional, spectral index of kappa distribution
-    # mass        float       optional, particle mass in multiples of electron mass
-    if initialE:
-        fluxmap['final_E'] = fluxmap['init_E']
-    diff_flux = pp.map_flux(fluxmap)
-    if not initialE:
-        nener, nalph = diff_flux.shape
-        for idx, jdx in it.product(range(nener), range(nalph)):
-            if np.linalg.norm(fluxmap['final_x'][idx, jdx]) >= 14.99:
-                continue
-            else:
-                diff_flux[idx, jdx] = 0.
-    if fov:
-        angles = instrFOV(fluxmap)
-        amask = angles < 90
-        diff_flux[amask] = 0.
-    omni = pp.get_omni_flux(fluxmap['angles'], diff_flux)
+class CXD(post.ptm_postprocessor):
 
-    return omni
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+
+    def calculate_omni(self, fluxmap, fov=False, initialE=False):
+        self.set_source(source_type='kaprel', params=dict(density=5e-6, energy=752.0, kappa=5.0, mass=1847.0))
+        # n_dens      float       optional, number density at source region in cm-3
+        # e_char      float       optional, characteristic energy of distribution in keV
+        # kappa       float       optional, spectral index of kappa distribution
+        # mass        float       optional, particle mass in multiples of electron mass
+        if initialE:
+            fluxmap['final_E'] = fluxmap['init_E']
+        diff_flux = self.map_flux(fluxmap)
+        if not initialE:
+            nener, nalph = diff_flux.shape
+            for idx, jdx in it.product(range(nener), range(nalph)):
+                if np.linalg.norm(fluxmap['final_x'][idx, jdx]) >= 14.99:
+                    continue
+                else:
+                    diff_flux[idx, jdx] = 0.
+        if fov:
+            angles = self.instrFOV(fluxmap)
+            amask = angles < 90
+            diff_flux[amask] = 0.
+        omni = self.get_omni_flux(fluxmap['angles'], diff_flux)
+
+        return omni
+
+    def instrFOV(self, fluxmap):
+        # get the instrument field-of-view axis
+        # CXD is nadir pointing, so FOW axis is inverse of position vector
+        fovaxis = -1*fluxmap.attrs['position']
+        fovaxis = fovaxis/np.linalg.norm(fovaxis)
+        # get angle between inverse of FOV axis and initial particle velocity
+        # (because velocity needs to point in to the detector aperture)
+        fiv = fluxmap['init_v']
+        angles = np.zeros((fiv.shape[0], fiv.shape[1]))
+        for idx in range(fiv.shape[0]):
+            for jdx in range(fiv.shape[1]):
+                angles[idx, jdx] = np.rad2deg(np.arccos(np.dot(-1*fovaxis, fluxmap['init_v'][idx, jdx]
+                                                               /np.linalg.norm(fluxmap['init_v'][idx, jdx]))))
+        return angles
+
 
 def plot_omni(omni, fluxmap):
     fig = plt.figure()
@@ -137,37 +158,24 @@ def add_extra_omni(ax, omni, fluxmap, **kwargs):
     ax.loglog(fluxmap['energies']/1e3, omni*1e3, **kwargs)
 
 
-def instrFOV(fluxmap):
-    # get the instrument field-of-view axis
-    # CXD is nadir pointing, so FOW axis is inverse of position vector
-    fovaxis = -1*fluxmap.attrs['position']
-    fovaxis = fovaxis/np.linalg.norm(fovaxis)
-    # get angle between inverse of FOV axis and initial particle velocity
-    # (because velocity needs to point in to the detector aperture)
-    fiv = fluxmap['init_v']
-    angles = np.zeros((fiv.shape[0], fiv.shape[1]))
-    for idx in range(fiv.shape[0]):
-        for jdx in range(fiv.shape[1]):
-            angles[idx, jdx] = np.rad2deg(np.arccos(np.dot(-1*fovaxis, fluxmap['init_v'][idx, jdx]
-                                                           /np.linalg.norm(fluxmap['init_v'][idx, jdx]))))
-    return angles
-
 
 if __name__ == '__main__':
     # Set up a basic argument parser
     parser = argparse.ArgumentParser()
+    # Add a positional argument for the ptm_output folder
     parser.add_argument('dir')
     opt = parser.parse_args()
 
     fns = glob.glob(os.path.join(opt.dir, 'map_*.dat'))
+    cxd = CXD()
     fluxmap = ptt.parse_map_file(fns)
     fluxmap_1 = copy.deepcopy(fluxmap)
     fluxmap_2 = copy.deepcopy(fluxmap)
-    omni = calculate_omni(fluxmap)
+    omni = cxd.calculate_omni(fluxmap)
     cdict, allow = cutoffs(fluxmap, addTo=None)
-    omni1 = calculate_omni(fluxmap_1, fov=True)
+    omni1 = cxd.calculate_omni(fluxmap_1, fov=True)
     fig, axes = plot_omni(omni, fluxmap)
-    omni2 = calculate_omni(fluxmap_2, initialE=True)
+    omni2 = cxd.calculate_omni(fluxmap_2, initialE=True)
     add_extra_omni(axes[0], omni1, fluxmap_1, label='CXD', color='orange')
     #cdict1, allow1 = cutoffs(fluxmap_1, addTo=axes[0], linestyle='--', color='orange')
     add_extra_omni(axes[0], omni2, fluxmap_2, label='Initial', color='green')
