@@ -3,27 +3,53 @@ import os
 import glob
 import copy
 import argparse
+import datetime as dt
 import itertools as it
 import numpy as np
+from scipy import interpolate
 import spacepy.toolbox as tb
 import matplotlib.pyplot as plt
 
 from ptm_python import ptm_tools as ptt
 from ptm_python import ptm_postprocessing as post
 
+import gps_position
 
 class CXD(post.ptm_postprocessor):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        sd = self._ptm_postprocessor__supported_distributions
+        self.cutoff_info = dict()
 
+    def set_source(self, source_type='kappa', params={}, empflux={}):
+        '''set source flux spectrum
 
-    def calculate_omni(self, fluxmap, fov=False, initialE=False):
-        self.set_source(source_type='kaprel', params=dict(density=5e-6, energy=752.0, kappa=5.0, mass=1847.0))
-        # n_dens      float       optional, number density at source region in cm-3
-        # e_char      float       optional, characteristic energy of distribution in keV
-        # kappa       float       optional, spectral index of kappa distribution
-        # mass        float       optional, particle mass in multiples of electron mass
+        If empirical, pass in a dict of energy and flux values
+        empflux = {'flux': [values], 'energy': [values]}
+        '''
+        if source_type == 'empirical':
+            self.get_flux = interpolate.interp1d(empflux['energy'], empflux['flux'],
+                                                 kind='linear', axis=-1, copy=True,
+                                                 bounds_error=None, fill_value='extrapolate',
+                                                 assume_sorted=False)
+            self.source_type = source_type
+        else:
+            super().set_source(source_type=source_type, params=params)
+
+    def calculate_omni(self, fluxmap, fov=False, initialE=False, source=None):
+        if source is None:
+            fluxdict = gps_position.getSpectrum('ns61', dt.datetime(2017, 9, 6, 13, 5))
+            fluxdict['energy'] = fluxdict['energy']*1000  # Convert energy from MeV to keV
+            fluxdict['flux'] = fluxdict['flux']/1000  # Convert flux from per MeV to per keV
+            #self.set_source(source_type='empirical', empflux={'energy': evals, 'flux': fvals})
+            self.set_source(source_type='empirical', empflux=fluxdict)
+        else:
+            self.set_source(source_type='kaprel', params=dict(density=5e-6, energy=752.0, kappa=5.0, mass=1847.0))
+            # n_dens      float       optional, number density at source region in cm-3
+            # e_char      float       optional, characteristic energy of distribution in keV
+            # kappa       float       optional, spectral index of kappa distribution
+            # mass        float       optional, particle mass in multiples of electron mass
         if initialE:
             fluxmap['final_E'] = fluxmap['init_E']
         diff_flux = self.map_flux(fluxmap)
@@ -57,8 +83,67 @@ class CXD(post.ptm_postprocessor):
                                                                /np.linalg.norm(fluxmap['init_v'][idx, jdx]))))
         return angles
 
+    def cutoffs(self, fluxmap, addTo=None, verbose=True, **kwargs):
+        # find energies where access is forbidden
+        if False:  # binary - any access at E or no access
+            allow = np.array([True if (np.abs(fluxmap['final_x'][n])==15).any()
+                              else False for n in range(len(fluxmap['energies']))])
+        else:  # fractional
+            allow = np.array([np.sum(np.linalg.norm(fluxmap['final_x'][n], axis=-1) >= 14.99)
+                              for n in range(len(fluxmap['energies']))], dtype=np.float)
+            allow /= len(fluxmap['angles'])
+    
+        en_mev = fluxmap['energies']/1e3
+        cdict = dict()
+        # Earth (1.1Re to include atmosphere) subtends ~0.225 ster
+        # (solid angle = 2*pi*(1-cos(theta)), where theta is angle of inverse
+        # position vector to limb of Earth)
+        # 0.225 ster/4*pi = 0.179
+        not_forbidden = np.nonzero(allow)[0]
+        full_access = allow>0.82  # 1-0.18 = 0.82
+        idx_low = not_forbidden[0]
+        ec_low = en_mev[idx_low]
+        # upper cutoff is where all values are "full" transmission
+        # Here "full" accounts for solid angle of Earth
+        try:
+            idx_high = find_runs(full_access)[-1][0]
+        except IndexError:
+            idx_high = -1
+        ec_high = en_mev[idx_high]
+        if verbose:
+            print('Ec_low = {}'.format(ec_low))
+            print('Ec_high = {}'.format(ec_high))
+        prot_low = ptt.Proton(ec_low)
+        prot_high = ptt.Proton(ec_high)
+    
+        Nforbid = np.sum(allow*len(fluxmap['angles']))
+        Ntot = len(allow)*len(fluxmap['angles'])
+        r_low = prot_low.getRigidity()
+        r_high = prot_high.getRigidity()
+        r_effect = r_low + (r_high-r_low) * Nforbid/Ntot
+        cdict['ec_low'] = ec_low
+        cdict['r_low'] = r_low
+        cdict['ec_high'] = ec_high
+        cdict['r_high'] = r_high
+        cdict['r_eff'] = r_effect
+        cdict['ec_eff'] = ptt.Proton.fromRigidity(r_effect).energy
+        cdict['allow'] = allow
+        if addTo is not None:
+            if 'linestyle' not in kwargs:
+                kwargs['linestyle'] = '--'
+            if 'color' not in kwargs:
+                kwargs['color'] = 'b'
+            labeltext = 'E$_{c}^{eff}$ = ' + '{0:.2f} MeV'.format(cdict['ec_eff'])\
+                        + '\nR$_C$ = ' + '{0:.2f} GV'.format(cdict['r_eff'])
+            if 'label_pre' in kwargs:
+                labeltext = kwargs['label_pre'] + '\n' + labeltext
+            addTo.axvline(x=cdict['ec_eff'], linestyle=kwargs['linestyle'], color=kwargs['color'],
+                          label=labeltext)
+        self.cutoff_info = cdict
+        return cdict, allow
 
-def plot_omni(omni, fluxmap):
+
+def plot_omni(instr, omni, fluxmap):
     fig = plt.figure()
     ax0 = fig.add_axes([0.15, 0.2, 0.78, 0.6])
     en_mev = fluxmap['energies']/1e3
@@ -68,7 +153,7 @@ def plot_omni(omni, fluxmap):
     ax0.set_ylabel('Diff. Flux [per MeV]')
     ax0.set_title(fluxmap.attrs['position'])
 
-    cdict, allow = cutoffs(fluxmap, addTo=ax0, linestyle='--', color='b')
+    cdict, allow = instr.cutoffs(fluxmap, addTo=ax0, linestyle='--', color='b')
     #ax0.axvline(x=cdict['ec_low'], linestyle=':', color='k',
     #            label='E$_{c}^{low}$ = ' + '{0:.2f} MeV'.format(cdict['ec_low']))
     #ax0.axvline(x=cdict['ec_high'], linestyle=':', color='k',
@@ -87,62 +172,6 @@ def plot_omni(omni, fluxmap):
     ax1.set_xlim(np.log10([enlo, enhi]))
     return fig, [ax0, ax1]
 
-
-def cutoffs(fluxmap, addTo=None, **kwargs):
-    # find energies where access is forbidden
-    if False:  # binary - any access at E or no access
-        allow = np.array([True if (np.abs(fluxmap['final_x'][n])==15).any()
-                          else False for n in range(len(fluxmap['energies']))])
-    else:  # fractional
-        allow = np.array([np.sum(np.linalg.norm(fluxmap['final_x'][n], axis=-1) >= 14.99)
-                          for n in range(len(fluxmap['energies']))], dtype=np.float)
-        allow /= len(fluxmap['angles'])
-
-    en_mev = fluxmap['energies']/1e3
-    cdict = dict()
-    # Earth (1.1Re to include atmosphere) subtends ~0.225 ster
-    # (solid angle = 2*pi*(1-cos(theta)), where theta is angle of inverse
-    # position vector to limb of Earth)
-    # 0.225 ster/4*pi = 0.179
-    not_forbidden = np.nonzero(allow)[0]
-    full_access = allow>0.82  # 1-0.18 = 0.82
-    idx_low = not_forbidden[0]
-    ec_low = en_mev[idx_low]
-    print('Ec_low = {}'.format(ec_low))
-    # upper cutoff is where all values are "full" transmission
-    # Here "full" accounts for solid angle of Earth
-    try:
-        idx_high = find_runs(full_access)[-1][0]
-    except IndexError:
-        idx_high = -1
-    ec_high = en_mev[idx_high]
-    print('Ec_high = {}'.format(ec_high))
-    prot_low = ptt.Proton(ec_low)
-    prot_high = ptt.Proton(ec_high)
-
-    Nforbid = np.sum(allow*len(fluxmap['angles']))
-    Ntot = len(allow)*len(fluxmap['angles'])
-    r_low = prot_low.getRigidity()
-    r_high = prot_high.getRigidity()
-    r_effect = r_low + (r_high-r_low) * Nforbid/Ntot
-    cdict['ec_low'] = ec_low
-    cdict['r_low'] = r_low
-    cdict['ec_high'] = ec_high
-    cdict['r_high'] = r_high
-    cdict['r_eff'] = r_effect
-    cdict['ec_eff'] = ptt.Proton.fromRigidity(r_effect).energy
-    if addTo is not None:
-        if 'linestyle' not in kwargs:
-            kwargs['linestyle'] = '--'
-        if 'color' not in kwargs:
-            kwargs['color'] = 'b'
-        labeltext = 'E$_{c}^{eff}$ = ' + '{0:.2f} MeV'.format(cdict['ec_eff'])\
-                    + '\nR$_C$ = ' + '{0:.2f} GV'.format(cdict['r_eff'])
-        if 'label_pre' in kwargs:
-            labeltext = kwargs['label_pre'] + '\n' + labeltext
-        addTo.axvline(x=cdict['ec_eff'], linestyle=kwargs['linestyle'], color=kwargs['color'],
-                      label=labeltext)
-    return cdict, allow
 
 
 def find_runs(invec, value=True):
@@ -172,15 +201,15 @@ if __name__ == '__main__':
     fluxmap_1 = copy.deepcopy(fluxmap)
     fluxmap_2 = copy.deepcopy(fluxmap)
     omni = cxd.calculate_omni(fluxmap)
-    cdict, allow = cutoffs(fluxmap, addTo=None)
     omni1 = cxd.calculate_omni(fluxmap_1, fov=True)
-    fig, axes = plot_omni(omni, fluxmap)
+    fig, axes = plot_omni(cxd, omni, fluxmap)
     omni2 = cxd.calculate_omni(fluxmap_2, initialE=True)
     add_extra_omni(axes[0], omni1, fluxmap_1, label='CXD', color='orange')
     #cdict1, allow1 = cutoffs(fluxmap_1, addTo=axes[0], linestyle='--', color='orange')
     add_extra_omni(axes[0], omni2, fluxmap_2, label='Initial', color='green')
     axes[0].legend()
     ylims = axes[0].get_ylim()
+    cdict = cxd.cutoff_info
     axes[0].plot(cdict['ec_low'], ylims[0], marker='^', mec='k', mfc='silver', clip_on=False)
     axes[0].plot(cdict['ec_high'], ylims[0], marker='^', mec='k', mfc='grey', clip_on=False)
     axes[0].set_ylim(ylims)
