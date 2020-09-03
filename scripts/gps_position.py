@@ -36,6 +36,7 @@ def getPosition(sat, targ_time, verbose=False):
     """
     gpsfile = findDataFile(sat, targ_time)
     data = dm.readJSONheadedASCII(gpsfile)
+    # Get time (this is GPS time, not UTC, even though we're treating it that way)
     utc = spt.doy2date(data['year'].astype(int), data['decimal_day'], dtobj=True, flAns=True)
     # Find time nearest to requested
     idx = bisect.bisect(utc, targ_time)
@@ -57,6 +58,25 @@ def getPosition(sat, targ_time, verbose=False):
         print(posargs)
 
     return posargs
+
+
+def getSpectrum(sat, targ_time):
+    """Get energy versus flux of given GPS satellite at requested time
+    """
+    gpsfile = findDataFile(sat, targ_time)
+    data = dm.readJSONheadedASCII(gpsfile)
+    # Get time (this is GPS time, not UTC, even though we're treating it that way)
+    utc = spt.doy2date(data['year'].astype(int), data['decimal_day'], dtobj=True, flAns=True)
+    # Find time nearest to requested
+    idx = bisect.bisect(utc, targ_time)
+    d1 = np.abs((utc[idx-1]-targ_time).total_seconds())
+    d2 = np.abs((utc[idx]-targ_time).total_seconds())
+    idx = idx-1 if d1 <= d2 else idx
+    # Get energy spectrum
+    energy = data['proton_flux_fit_energy'][idx]
+    flux = data['proton_flux_fit'][idx]
+    return {'energy': energy, 'flux': flux}
+
 
 if __name__ == '__main__':
     # Set up a basic argument parser
