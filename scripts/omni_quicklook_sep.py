@@ -15,15 +15,18 @@ from ptm_python import ptm_postprocessing as post
 
 import gps_position
 
-class CXD(post.ptm_postprocessor):
 
+class CXD(post.ptm_postprocessor):
+    """CXD Instrument subclassed from PTM post-processor
+    """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        sd = self._ptm_postprocessor__supported_distributions
         self.cutoff_info = dict()
+        self.instrument_info = dict()
+
 
     def set_source(self, source_type='kappa', params={}, empflux={}):
-        '''set source flux spectrum
+        '''Set source flux spectrum [cm^-1 s^-1 keV^-1 sr^-1]
 
         If empirical, pass in a dict of energy and flux values
         empflux = {'flux': [values], 'energy': [values]}
@@ -37,13 +40,12 @@ class CXD(post.ptm_postprocessor):
         else:
             super().set_source(source_type=source_type, params=params)
 
+
     def calculate_omni(self, fluxmap, fov=False, initialE=False, source=None):
-        if source is None:
-            fluxdict = gps_position.getSpectrum('ns61', dt.datetime(2017, 9, 6, 13, 5))
-            fluxdict['energy'] = fluxdict['energy']*1000  # Convert energy from MeV to keV
-            fluxdict['flux'] = fluxdict['flux']/1000  # Convert flux from per MeV to per keV
-            #self.set_source(source_type='empirical', empflux={'energy': evals, 'flux': fvals})
-            self.set_source(source_type='empirical', empflux=fluxdict)
+        '''Source flux spectrum is per steradian. Output is per steradian.
+        '''
+        if source is not None:
+            self.set_source(source_type='empirical', empflux=source)
         else:
             self.set_source(source_type='kaprel', params=dict(density=5e-6, energy=752.0, kappa=5.0, mass=1847.0))
             # n_dens      float       optional, number density at source region in cm-3
@@ -60,28 +62,57 @@ class CXD(post.ptm_postprocessor):
                     continue
                 else:
                     diff_flux[idx, jdx] = 0.
+        per_ster = 4*np.pi
         if fov:
-            angles = self.instrFOV(fluxmap)
-            amask = angles < 90
-            diff_flux[amask] = 0.
+            self.instrFOV(fluxmap, fov=fov)
+            diff_flux[self.instrument_info['angle_mask']] = 0.0
+            per_ster = self.instrument_info['norm_per_steradian']
         omni = self.get_omni_flux(fluxmap['angles'], diff_flux)
+        # omni, at this point, is integrated over look direction
+        # so we divide by a normalization factor to get our flux per steradian
+        omni /= per_ster
 
         return omni
 
-    def instrFOV(self, fluxmap):
+
+    def instrFOV(self, fluxmap, fov=90, dir='nadir', verbose=False):
         # get the instrument field-of-view axis
         # CXD is nadir pointing, so FOW axis is inverse of position vector
-        fovaxis = -1*fluxmap.attrs['position']
+        posvec = fluxmap.attrs['position']
+        posvec = posvec/np.linalg.norm(posvec)
+        fovaxis = -1*posvec
         fovaxis = fovaxis/np.linalg.norm(fovaxis)
+        nadir = fovaxis.copy()
+        if dir.lower() == 'east':
+            fovaxis = np.cross(fovaxis, [0, 0, 1])
+            fovaxis = fovaxis/np.linalg.norm(fovaxis)
+        elif dir.lower() == 'west':
+            fovaxis *= -1
+        elif dir.lower() == 'nadir':
+            pass
+        else:
+            raise NotImplementedError('Requested direction ({}) not defined.'.format(dir))
+        if verbose:
+            print("Position: {:0.3f},{:0.3f},{:0.3f}".format(*posvec.tolist()))
+            print("Nadir: {:0.3f},{:0.3f},{:0.3f}".format(*nadir.tolist()))
+            print("FOV: {:0.3f},{:0.3f},{:0.3f}".format(*fovaxis.tolist()))
         # get angle between inverse of FOV axis and initial particle velocity
         # (because velocity needs to point in to the detector aperture)
         fiv = fluxmap['init_v']
         angles = np.zeros((fiv.shape[0], fiv.shape[1]))
-        for idx in range(fiv.shape[0]):
-            for jdx in range(fiv.shape[1]):
-                angles[idx, jdx] = np.rad2deg(np.arccos(np.dot(-1*fovaxis, fluxmap['init_v'][idx, jdx]
-                                                               /np.linalg.norm(fluxmap['init_v'][idx, jdx]))))
-        return angles
+        for idx, jdx in it.product(range(fiv.shape[0]), range(fiv.shape[1])):
+            angles[idx, jdx] = np.rad2deg(np.arccos(np.dot(-1*fovaxis, fluxmap['init_v'][idx, jdx]
+                                                           /np.linalg.norm(fluxmap['init_v'][idx, jdx]))))
+        self.instrument_info['angles'] = angles
+        self.instrument_info['angle_mask'] = angles < fov
+        self.instrument_info['FOV_degrees'] = fov
+        # self.instrument_info['norm_per_steradian'] = 2*np.pi*(1-np.cos(np.deg2rad(fov)))
+        # Normalization is borked because omnidirectional flux integration assumes gyrotropy
+        if fov == 90:
+            self.instrument_info['norm_per_steradian'] = 2*np.pi
+        else:
+            NotImplementedError
+
 
     def cutoffs(self, fluxmap, addTo=None, verbose=True, **kwargs):
         # find energies where access is forbidden
@@ -100,7 +131,7 @@ class CXD(post.ptm_postprocessor):
         # position vector to limb of Earth)
         # 0.225 ster/4*pi = 0.179
         not_forbidden = np.nonzero(allow)[0]
-        full_access = allow>0.82  # 1-0.18 = 0.82
+        full_access = allow >= 0.821  # 1-0.179 = 0.821
         idx_low = not_forbidden[0]
         ec_low = en_mev[idx_low]
         # upper cutoff is where all values are "full" transmission
@@ -132,7 +163,7 @@ class CXD(post.ptm_postprocessor):
             if 'linestyle' not in kwargs:
                 kwargs['linestyle'] = '--'
             if 'color' not in kwargs:
-                kwargs['color'] = 'b'
+                kwargs['color'] = 'dimgrey'
             labeltext = 'E$_{c}^{eff}$ = ' + '{0:.2f} MeV'.format(cdict['ec_eff'])\
                         + '\nR$_C$ = ' + '{0:.2f} GV'.format(cdict['r_eff'])
             if 'label_pre' in kwargs:
@@ -143,11 +174,11 @@ class CXD(post.ptm_postprocessor):
         return cdict, allow
 
 
-def plot_omni(instr, omni, fluxmap):
+def plot_omni(instr, omni, fluxmap, label='Omni'):
     fig = plt.figure()
     ax0 = fig.add_axes([0.15, 0.2, 0.78, 0.6])
     en_mev = fluxmap['energies']/1e3
-    ax0.loglog(en_mev, omni*1e3, label='Omni')
+    ax0.loglog(en_mev, omni*1e3, label=label)
     enlo, enhi = en_mev[0], en_mev[-1]
     ax0.set_xlabel('Energy [MeV]')
     ax0.set_ylabel('Diff. Flux [per MeV]')
@@ -189,24 +220,45 @@ def add_extra_omni(ax, omni, fluxmap, **kwargs):
 
 
 if __name__ == '__main__':
+    import bisect
+    import gpstools as gpt
+
     # Set up a basic argument parser
     parser = argparse.ArgumentParser()
     # Add a positional argument for the ptm_output folder
     parser.add_argument('dir')
     opt = parser.parse_args()
-
+    # Grab the simulation output and set up post-processor
     fns = glob.glob(os.path.join(opt.dir, 'map_*.dat'))
     cxd = CXD()
     fluxmap = ptt.parse_map_file(fns)
-    fluxmap_1 = copy.deepcopy(fluxmap)
-    fluxmap_2 = copy.deepcopy(fluxmap)
-    omni = cxd.calculate_omni(fluxmap)
-    omni1 = cxd.calculate_omni(fluxmap_1, fov=True)
-    fig, axes = plot_omni(cxd, omni, fluxmap)
-    omni2 = cxd.calculate_omni(fluxmap_2, initialE=True)
-    add_extra_omni(axes[0], omni1, fluxmap_1, label='CXD', color='orange')
-    #cdict1, allow1 = cutoffs(fluxmap_1, addTo=axes[0], linestyle='--', color='orange')
-    add_extra_omni(axes[0], omni2, fluxmap_2, label='Initial', color='green')
+    fluxmap_inst = copy.deepcopy(fluxmap)
+    fluxmap_source = copy.deepcopy(fluxmap)
+    # Get source spectrum from minimally-shielded CXD
+    targ = dt.datetime(2017, 9, 6, 13, 5)
+    obsdict = gps_position.getSpectrum('ns61', targ)
+    obsdict['energy'] = obsdict['energy']*1000  # Convert energy from MeV to keV
+    obsdict['flux'] = obsdict['flux']/1000  # Convert flux from per MeV to per keV
+    fluxlim = 60  # MeV - lower limit for integration
+    # Get target spectrum
+    obs = gpt.loadCXDascii(72, '17090*')
+    idx = bisect.bisect_left(obs['UTC'], targ)
+    obs_gt = interpolate.BSpline(*(interpolate.splrep(obs['proton_flux_fit_energy'][idx],
+                                   obs['proton_flux_fit'][idx]))).integrate(np.min(fluxlim),np.max(800))
+    # Calculate fluxes and plot
+    omni = cxd.calculate_omni(fluxmap, source=obsdict)
+    omni_inst = cxd.calculate_omni(fluxmap_inst, source=obsdict, fov=90)
+    omn_gt = interpolate.BSpline(*(interpolate.splrep(fluxmap['energies'], omni_inst)
+                                 )).integrate(np.min(fluxlim*1000),np.max(800000))
+    fig, axes = plot_omni(cxd, omni_inst, fluxmap, label='ns72 predicted')
+    omni_source = cxd.calculate_omni(fluxmap_source, source=obsdict, initialE=True)
+    print(">{}MeV: obs={}; pred={}".format(fluxlim, obs_gt, omn_gt))
+    # add_extra_omni(axes[0], omni_inst, fluxmap_inst, label='CXD', color='orange')
+    add_extra_omni(axes[0], omni_source, fluxmap_source, label='Source (@ ns61)', color='green')
+    ## Plot initial spectrum
+    # axes[0].plot(obsdict['energy']/1000, obsdict['flux']*1000, 'k-.')
+    ## Plot expected, everything is omni flux _per steradian_
+    # axes[0].plot(obs['proton_flux_fit_energy'][idx], obs['proton_flux_fit'][idx], 'y:', label='ns72')
     axes[0].legend()
     ylims = axes[0].get_ylim()
     cdict = cxd.cutoff_info
