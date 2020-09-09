@@ -187,16 +187,18 @@ int main( int argc, char *argv[] ){
     zfinal = +15;
 
     // open output files
-    int il = 1;
+    int il = 1;  // Number of timestep. TODO: loop to generate multiple times if reqd.
     char buffer[256];
 
-    // Write to a single, new format, PTM output file
-    // first line is:  Nx Ny Nz
-    // second line is: X1, X2, ..., XN
-    // third line is: Y1, Y2, ..., YN
-    // fourth line is: Z1, Z2, ..., ZN
-    // subsequent lines are: i j k Bx By Bz Ex Ey Ex
-    // k increases fastest, then j, then i
+    /*
+     * Write to a single, new format, PTM output file
+     * first line is:  Nx Ny Nz
+     * second line is: X1, X2, ..., XN
+     * third line is: Y1, Y2, ..., YN
+     * fourth line is: Z1, Z2, ..., ZN
+     * subsequent lines are: i j k Bx By Bz Ex Ey Ex
+     * k increases fastest, then j, then i
+     */
 
     // E/B-Field output file
     sprintf(buffer, "./ptm_T89_data/ptm_fields_%04d.txt", il);
