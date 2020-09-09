@@ -1,4 +1,7 @@
 #include <stdio.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include <argp.h>
 #include <fcntl.h>
 #include <Lgm_CTrans.h>
@@ -189,6 +192,7 @@ int main( int argc, char *argv[] ){
     // open output files
     int il = 1;  // Number of timestep. TODO: loop to generate multiple times if reqd.
     char buffer[256];
+    char dirname[256];
 
     /*
      * Write to a single, new format, PTM output file
@@ -201,7 +205,13 @@ int main( int argc, char *argv[] ){
      */
 
     // E/B-Field output file
-    sprintf(buffer, "./ptm_T89_data/ptm_fields_%04d.txt", il);
+    sprintf(dirname, "%s_%ld", model_str, Date);
+    sprintf(buffer, "%s_%ld/ptm_fields_%04d.txt", model_str, Date, il);
+    // First test for directory
+    struct stat st = {0};
+    if (stat(dirname, &st) == -1) {
+        mkdir(dirname, 0700);
+        }
     FILE *fields = fopen(buffer, "w");
 
     // Write header
