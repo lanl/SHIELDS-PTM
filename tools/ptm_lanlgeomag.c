@@ -103,13 +103,16 @@ int main( int argc, char *argv[] ){
     int                 verbose, UseTS07=0;
     char                IntModel[20], ExtModel[20];
     int                 i, j, k, sYear, sMonth, sDay, sDoy;
+    int                 Year, Month, Day;
     long int            Date;
 
-    double              JD, UTC;
+    double              sJD, JD, eJD, UTC;
     Lgm_Vector          u, B;
     Lgm_MagModelInfo    *mInfo = Lgm_InitMagInfo(0);
     Lgm_QinDentonOne qd;
     char model_str[] = "T96";
+    char buffer[256];
+    char dirname[256];
 
     // grid extents to match ptm
     double xstart, xfinal;
@@ -117,10 +120,15 @@ int main( int argc, char *argv[] ){
     double zstart, zfinal;
     //number of points to match ptm
     double n = 121; //TODO: read on cmd line
+    // Number of time steps
+    int nt;
+    int t_tot = 12;
+    double deltat = 300;  // seconds between time snapshots
+    double deltaJD = deltat/86400.0;
 
-   /*
-    *  Default option values.
-    */
+    /*
+     *  Default option values.
+     */
     arguments.StartDate = 20170907;
     strcpy( arguments.IntModel, "IGRF" );
     strcpy( arguments.ExtModel, "T96" );
@@ -136,13 +144,14 @@ int main( int argc, char *argv[] ){
     int minute = (arguments.Time - hour*10000)/100;
     int second = (arguments.Time - hour*10000) - minute*100;
     UTC = (float)hour + (float)minute/60.0 + (float)second/3600.0;
-    Date = arguments.StartDate;
-    Lgm_Set_Coord_Transforms(Date, UTC, mInfo->c);
-    Lgm_Doy(Date, &sYear, &sMonth, &sDay, &sDoy);
-    JD = Lgm_JD(sYear, sMonth, sDay, UTC, LGM_TIME_SYS_UTC, mInfo->c);
-    if (verbose) {
+    Lgm_Set_Coord_Transforms(arguments.StartDate, UTC, mInfo->c);
+    Lgm_Doy(arguments.StartDate, &sYear, &sMonth, &sDay, &sDoy);
+    sJD = Lgm_JD(sYear, sMonth, sDay, UTC, LGM_TIME_SYS_UTC, mInfo->c);
+    eJD = sJD + deltaJD*(t_tot-1);
+    if (verbose > 1) {
         printf("Hour:Minute:Second = %02d:%02d:%02d (UTC=%f)\n", hour, minute, second, UTC);
         printf("JD = %f\n", JD);
+        verbose = 1;
         }
 
     // Now set field options
@@ -185,14 +194,6 @@ int main( int argc, char *argv[] ){
        mInfo->InternalModel = LGM_IGRF;
     }
 
-    /*
-     *  Qin-Denton parameters can be obtained automatically by date/time ....
-     */
-    Lgm_get_QinDenton_at_JD( JD, &qd, verbose , 0);  // Get (interpolate) the QinDenton vals
-                                                     // from the values in the file at the
-                                                     // given Julian Date.
-    Lgm_set_QinDenton( &qd, mInfo );                 // Set params in mInfo structure.
-
     // Grid to match ptm_tec_interp.py
     // TODO: read on cmd line
     xstart = -15;
@@ -202,66 +203,87 @@ int main( int argc, char *argv[] ){
     zstart = -15;
     zfinal = +15;
 
-    // open output files
     int il = 1;  // Number of timestep. TODO: loop to generate multiple times if reqd.
-    char buffer[256];
-    char dirname[256];
+    for (JD = sJD; JD <= eJD; JD += deltaJD ) {
+        /*
+         * Write to a single, new format, PTM output file
+         * first line is:  Nx Ny Nz
+         * second line is: X1, X2, ..., XN
+         * third line is: Y1, Y2, ..., YN
+         * fourth line is: Z1, Z2, ..., ZN
+         * subsequent lines are: i j k Bx By Bz Ex Ey Ex
+         * k increases fastest, then j, then i
+         */
 
-    /*
-     * Write to a single, new format, PTM output file
-     * first line is:  Nx Ny Nz
-     * second line is: X1, X2, ..., XN
-     * third line is: Y1, Y2, ..., YN
-     * fourth line is: Z1, Z2, ..., ZN
-     * subsequent lines are: i j k Bx By Bz Ex Ey Ex
-     * k increases fastest, then j, then i
-     */
+        /*
+         *  Qin-Denton parameters can be obtained automatically by date/time ....
+         */
+        Lgm_JD_to_Date( JD, &Year, &Month, &Day, &UTC);
+        Date = Year*10000 + Month*100 + Day;
 
-    // E/B-Field output file
-    sprintf(dirname, "%s_%ld", model_str, Date);
-    sprintf(buffer, "%s_%ld/ptm_fields_%04d.txt", model_str, Date, il);
-    // First test for directory
-    struct stat st = {0};
-    if (stat(dirname, &st) == -1) {
-        mkdir(dirname, 0700);
-        }
-    FILE *fields = fopen(buffer, "w");
+        Lgm_Set_Coord_Transforms(Date, UTC, mInfo->c);
+        Lgm_get_QinDenton_at_JD(JD, &qd, verbose , 0);  // Get (interpolate) the QinDenton vals
+                                                        // from the values in the file at the
+                                                        // given Julian Date.
+        Lgm_set_QinDenton(&qd, mInfo);                  // Set params in mInfo structure.
 
-    // Write header
-    fprintf(fields, "%4d %4d %4d\n", (int)n, (int)n, (int)n);
-    for (i=0; i<n; i++) {
-        fprintf(fields, "%12.5e ", xstart + (xfinal - xstart)/(n-1.0)*i);
-        }
-    fprintf(fields, "\n");
-    for (i=0; i<n; i++) {
-        fprintf(fields, "%12.5e ", ystart + (yfinal - ystart)/(n-1.0)*i);
-        }
-    fprintf(fields, "\n");
-    for (i=0; i<n; i++) {
-        fprintf(fields, "%12.5e ", zstart + (zfinal - zstart)/(n-1.0)*i);
-        }
-    fprintf(fields, "\n");
+        // open output files
+        sprintf(dirname, "%s_%ld", model_str, Date);
+        // First test for directory
+        struct stat st = {0};
+        if (stat(dirname, &st) == -1) {
+            mkdir(dirname, 0700);
+            }
+        // E/B-Field output file
+        sprintf(buffer, "%s_%ld/ptm_fields_%04d.txt", model_str, Date, il);
+        FILE *fields = fopen(buffer, "w");
 
-    // Loop over positions and write out to opened files
-    for (i=0; i<n; i++){
-        for (j=0; j<n; j++){
-            for (k=0; k<n; k++){
-                //printf("%d, %d, %d\n", i, j, k);
-                u.x = xstart + (xfinal - xstart)/(n-1.0)*i;
-                u.y = ystart + (yfinal - ystart)/(n-1.0)*j;
-                u.z = zstart + (zfinal - zstart)/(n-1.0)*k;
-                // Call magnetic field function
-                mInfo->Bfield(&u, &B, mInfo);
-                // Write grid indices
-                fprintf(fields, "%4d %4d %4d ", i+1, j+1, k+1);
-                // Write magnetic field from semi-empirical model
-                // Write electric field as zero
-                fprintf(fields, " %12.5e %12.5e %12.5e %12.5e %12.5e %12.5e\n", B.x, B.y, B.z, 0.0, 0.0, 0.0);
+        // Write header
+        fprintf(fields, "%4d %4d %4d\n", (int)n, (int)n, (int)n);
+        for (i=0; i<n; i++) {
+            fprintf(fields, "%12.5e ", xstart + (xfinal - xstart)/(n-1.0)*i);
+            }
+        fprintf(fields, "\n");
+        for (i=0; i<n; i++) {
+            fprintf(fields, "%12.5e ", ystart + (yfinal - ystart)/(n-1.0)*i);
+            }
+        fprintf(fields, "\n");
+        for (i=0; i<n; i++) {
+            fprintf(fields, "%12.5e ", zstart + (zfinal - zstart)/(n-1.0)*i);
+            }
+        fprintf(fields, "\n");
+
+        // Loop over positions and write out to opened files
+        for (i=0; i<n; i++){
+            for (j=0; j<n; j++){
+                for (k=0; k<n; k++){
+                    //printf("%d, %d, %d\n", i, j, k);
+                    u.x = xstart + (xfinal - xstart)/(n-1.0)*i;
+                    u.y = ystart + (yfinal - ystart)/(n-1.0)*j;
+                    u.z = zstart + (zfinal - zstart)/(n-1.0)*k;
+                    // Call magnetic field function
+                    mInfo->Bfield(&u, &B, mInfo);
+                    // Write grid indices
+                    fprintf(fields, "%4d %4d %4d ", i+1, j+1, k+1);
+                    // Write magnetic field from semi-empirical model
+                    // Write electric field as zero
+                    fprintf(fields, " %12.5e %12.5e %12.5e %12.5e %12.5e %12.5e\n", B.x, B.y, B.z, 0.0, 0.0, 0.0);
+                }
             }
         }
+
+        fclose(fields);
+        il++;
     }
 
-    fclose(fields);
+    // Now write tgrid.dat file
+    sprintf(buffer, "%s_%ld/tgrid.dat", model_str, Date);
+    FILE *tgrid = fopen(buffer, "w");
+    for (nt=0; nt<t_tot; nt++) {
+        fprintf(tgrid, "%.18e\n", 0.0 + deltat*nt);
+        }
+    fclose(tgrid);
+
     Lgm_FreeMagInfo( mInfo );
 
     exit(0);
