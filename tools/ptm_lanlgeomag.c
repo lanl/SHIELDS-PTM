@@ -107,7 +107,7 @@ int main( int argc, char *argv[] ){
     double ystart, yfinal;
     double zstart, zfinal;
     //number of points to match ptm
-    double n = 75; //TODO: read on cmd line
+    double n = 121; //TODO: read on cmd line
 
    /*
     *  Default option values.
