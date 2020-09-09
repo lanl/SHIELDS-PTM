@@ -190,29 +190,32 @@ int main( int argc, char *argv[] ){
     int il = 1;
     char buffer[256];
 
-    // B-Field
-    sprintf(buffer, "./ptm_T89_data/bx3d_%s_%04d.txt", model_str, il);
-    FILE *fBx = fopen(buffer, "w");
-    sprintf(buffer, "./ptm_T89_data/by3d_%s_%04d.txt", model_str, il);
-    FILE *fBy = fopen(buffer, "w");
-    sprintf(buffer, "./ptm_T89_data/bz3d_%s_%04d.txt", model_str, il);
-    FILE *fBz = fopen(buffer, "w");
+    // Write to a single, new format, PTM output file
+    // first line is:  Nx Ny Nz
+    // second line is: X1, X2, ..., XN
+    // third line is: Y1, Y2, ..., YN
+    // fourth line is: Z1, Z2, ..., ZN
+    // subsequent lines are: i j k Bx By Bz Ex Ey Ex
+    // k increases fastest, then j, then i
 
-    // E-Field
-    sprintf(buffer, "./ptm_T89_data/ex3d_%s_%04d.txt", model_str, il);
-    FILE *fEx = fopen(buffer, "w");
-    sprintf(buffer, "./ptm_T89_data/ey3d_%s_%04d.txt", model_str, il);
-    FILE *fEy = fopen(buffer, "w");
-    sprintf(buffer, "./ptm_T89_data/ez3d_%s_%04d.txt", model_str, il);
-    FILE *fEz = fopen(buffer, "w");
+    // E/B-Field output file
+    sprintf(buffer, "./ptm_T89_data/ptm_fields_%04d.txt", il);
+    FILE *fields = fopen(buffer, "w");
 
-    // XYZ Grid
-    sprintf(buffer, "./ptm_T89_data/xgrid.txt");
-    FILE *fx = fopen(buffer, "w");
-    sprintf(buffer, "./ptm_T89_data/ygrid.txt");
-    FILE *fy = fopen(buffer, "w");
-    sprintf(buffer, "./ptm_T89_data/zgrid.txt");
-    FILE *fz = fopen(buffer, "w");
+    // Write header
+    fprintf(fields, "%4d %4d %4d\n", (int)n, (int)n, (int)n);
+    for (i=0; i<n; i++) {
+        fprintf(fields, "%12.5e ", xstart + (xfinal - xstart)/(n-1.0)*i);
+        }
+    fprintf(fields, "\n");
+    for (i=0; i<n; i++) {
+        fprintf(fields, "%12.5e ", ystart + (yfinal - ystart)/(n-1.0)*i);
+        }
+    fprintf(fields, "\n");
+    for (i=0; i<n; i++) {
+        fprintf(fields, "%12.5e ", zstart + (zfinal - zstart)/(n-1.0)*i);
+        }
+    fprintf(fields, "\n");
 
     // Loop over positions and write out to opened files
     for (i=0; i<n; i++){
@@ -224,41 +227,17 @@ int main( int argc, char *argv[] ){
                 u.z = zstart + (zfinal - zstart)/(n-1.0)*k;
                 // Call magnetic field function
                 mInfo->Bfield(&u, &B, mInfo);
+                // Write grid indices
+                fprintf(fields, "%4d %4d %4d ", i+1, j+1, k+1);
                 // Write magnetic field from semi-empirical model
-                fprintf(fBx, "%13g\n", B.x);
-                fprintf(fBy, "%13g\n", B.y);
-                fprintf(fBz, "%13g\n", B.z);
                 // Write electric field as zero
-                fprintf(fEx, "%13g\n", 0.0);
-                fprintf(fEy, "%13g\n", 0.0);
-                fprintf(fEz, "%13g\n", 0.0);
+                fprintf(fields, " %12.5e %12.5e %12.5e %12.5e %12.5e %12.5e\n", B.x, B.y, B.z, 0.0, 0.0, 0.0);
             }
         }
     }
 
-    fclose(fBx);
-    fclose(fBy);
-    fclose(fBz);
-    fclose(fEx);
-    fclose(fEy);
-    fclose(fEz);
+    fclose(fields);
+    Lgm_FreeMagInfo( mInfo );
 
-    // write coordinates to data file
-    for (i=0; i<n; i++) {
-        u.x = xstart + (xfinal - xstart)/(n-1.0)*i;
-        u.y = ystart + (yfinal - ystart)/(n-1.0)*i;
-        u.z = zstart + (zfinal - zstart)/(n-1.0)*i;
-
-        fprintf(fx, "%13g\n", u.x);
-        fprintf(fy, "%13g\n", u.y);
-        fprintf(fz, "%13g\n", u.z);
-    }
-
-    fclose(fx);
-    fclose(fy);
-    fclose(fz);
-
-  Lgm_FreeMagInfo( mInfo );
-
-  exit(0);
+    exit(0);
 }
