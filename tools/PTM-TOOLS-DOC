@@ -1,25 +1,23 @@
-PTM-Tools
+# PTM-Tools
 
-A. Alternate way of Preparing PTM input files (using LANLGeoMag instead of SWFM .mhd files)
+## Alternate way of Preparing PTM input files (using LANLGeoMag instead of SWMF  files)
 
-	PTM_LANLGEOMAG.c
-	1. to set the date and model for desired B-field, edit ptm_lanlgeomag.c 
+### ptm_lanlgeomag.c
+
+To compile and run on scheme, do
+```
+> module2 load lanlgeomag perl gsl
+> make
+> ./ptm_lanlgeomag
+```
+
+Selecting the date/time, and model for desired B-field, can bedone via the command-line
+parser.
 	
-	to compile and run on scheme, do 
-	> module2 load lanlgeomag perl gsl
-	> make
-	> ./ptm_lanlgeomag
+Output is created in creates in directory ptm_T89_data/
+- the model is evaluated on a uniform (spatial grid currently set in code in ptm_lanlgeomag.c)
+- the magnetic field, electric field and grid are all in one file
+- the electric field is set to zero as the field model is magnetic field only, and 
 
-	2. creates in directory ptm_T89_data/
-		a. a uniform "x/y/zgrid.txt" for E&B (choose spatial grid on lines 117-124 in ptm_lanlgeomag.c)
-		b. the magnetic field files "b(x,y,z)3d_000.txt"
-		c. the electric field files "e(x,y,z)3d_000.txt", which are all 0
-
-	IMPORTANT: The B/E data_output files do not contain the XYZ grid. You must use XYZ and B/E files that were both created with same run of ./ptm_lanlgeomag
-
-	Once 'ptm_T89_data' is created, push up to grizzly where PTM can be run
-	> scp -r ptm_T89_data user@wtrw:gr-fe:~/PTM/scripts/
-
-	PTM_LANLGEOMAG_INTERP.py
-	1. reads in the .txt files from ptm_T89_data/ and translates them into comparabale data products (.bin) produced by ptm_tec_interp.py.  Once created, move into ptm_data and follow PTM_DOC to create ptm_input
-	
+Once 'ptm_T89_data' is created, push up to grizzly where PTM can be run
+`> scp -r ptm_T89_data user@wtrw:gr-fe:~/PTM/scripts/`
