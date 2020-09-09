@@ -66,12 +66,12 @@ def getSpectrum(sat, targ_time):
     """
     gpsfile = findDataFile(sat, targ_time)
     data = dm.readJSONheadedASCII(gpsfile)
-    # Get time (this is GPS time, not UTC, even though we're treating it that way)
-    utc = spt.doy2date(data['year'].astype(int), data['decimal_day'], dtobj=True, flAns=True)
+    # Get UTC time
+    data['UTC'] = gpt.computeTime(data['year'], data['decimal_day']).UTC
     # Find time nearest to requested
-    idx = bisect.bisect(utc, targ_time)
-    d1 = np.abs((utc[idx-1]-targ_time).total_seconds())
-    d2 = np.abs((utc[idx]-targ_time).total_seconds())
+    idx = bisect.bisect(data['UTC'], targ_time)
+    d1 = np.abs((data['UTC'][idx-1]-targ_time).total_seconds())
+    d2 = np.abs((data['UTC'][idx]-targ_time).total_seconds())
     idx = idx-1 if d1 <= d2 else idx
     # Get energy spectrum
     energy = data['proton_flux_fit_energy'][idx]
