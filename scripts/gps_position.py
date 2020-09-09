@@ -9,6 +9,7 @@ import spacepy.datamodel as dm
 import spacepy.time as spt
 import spacepy.coordinates as spc
 
+import gpstools as gpt
 
 gpspath = '/n/space_data/LANL_GPS/Particle_Data/processed_ascii'
 
@@ -76,6 +77,12 @@ def getSpectrum(sat, targ_time):
     energy = data['proton_flux_fit_energy'][idx]
     flux = data['proton_flux_fit'][idx]
     return {'energy': energy, 'flux': flux}
+
+
+def get_response(svn):
+    response = gpt.response.read_response(svn, species='proton')
+    return response
+
 
 
 if __name__ == '__main__':
