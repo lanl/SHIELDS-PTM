@@ -35,19 +35,22 @@ static struct argp_option Options[] = {
     {"IntModel",  'i', "internal_model", 0, "Internal Magnetic Field Model to use. Default is IGRF"},
     {"ExtModel",  'e', "external_model", 0, "External Magnetic Field Model to use. Default is T89."},
     {"StartDate", 'd', "yyyymmdd",       0, "Date "},
-    {"Time",      't', "UTC",            0, "Time as fractional day"},
+    {"Time",      't', "UTC",            0, "Time as HHMMSS"},
+    {"Verbose",   'v', "Verbose",        0, "Verbose output? 1 - Yes; 0 - No"},
     { 0 }
     };
 
 
 struct Arguments {
-    char        *args[ nArgs ];       /* START_PA  END_PA  PA_INC */
+    char        *args[ nArgs ];
 
     char        IntModel[80];
     char        ExtModel[80];
 
     long int    StartDate;
-    double      Time;
+    long int    Time;
+
+    int         Verbose;
     };
 
 /* Parse a single option. */
@@ -61,13 +64,16 @@ static error_t parse_opt (int key, char *arg, struct argp_state *state) {
                 arguments->StartDate = atol(arg);
                 break;
             case 't':
-                sscanf( arg, "%lf", &arguments->Time );
+                arguments->Time = atol(arg);
                 break;
             case 'e': // external model
                 strcpy( arguments->ExtModel, arg );
                 break;
             case 'i': // internal model
                 strcpy( arguments->IntModel, arg );
+                break;
+            case 'v':
+                arguments->Verbose = atoi(arg);
                 break;
             case ARGP_KEY_ARG:
                 if (state->arg_num >= nArgs) {
@@ -94,12 +100,12 @@ static struct argp argp = { Options, parse_opt, ArgsDoc, doc };
 int main( int argc, char *argv[] ){
 
     struct              Arguments arguments;
-    int                 UseTS07=0;
+    int                 verbose, UseTS07=0;
     char                IntModel[20], ExtModel[20];
-    int                 i, j, k;
-    long int            JD, Date;
+    int                 i, j, k, sYear, sMonth, sDay, sDoy;
+    long int            Date;
 
-    double              UTC;
+    double              JD, UTC;
     Lgm_Vector          u, B;
     Lgm_MagModelInfo    *mInfo = Lgm_InitMagInfo(0);
     Lgm_QinDentonOne qd;
@@ -118,19 +124,26 @@ int main( int argc, char *argv[] ){
     arguments.StartDate = 20170907;
     strcpy( arguments.IntModel, "IGRF" );
     strcpy( arguments.ExtModel, "T96" );
-    arguments.Time = 0;
+    arguments.Time = 120000;
+    arguments.Verbose = 1;
 
     /*
      *  Parse CmdLine arguments and options
      */
     argp_parse (&argp, argc, argv, 0, 0, &arguments);
+    verbose = arguments.Verbose;
     int hour = arguments.Time/10000;
     int minute = (arguments.Time - hour*10000)/100;
     int second = (arguments.Time - hour*10000) - minute*100;
     UTC = (float)hour + (float)minute/60.0 + (float)second/3600.0;
     Date = arguments.StartDate;
-    Lgm_Set_Coord_Transforms( Date, UTC, mInfo->c );
-    JD = Lgm_Date_to_JD( arguments.StartDate, UTC, mInfo->c );     // Compute JD.
+    Lgm_Set_Coord_Transforms(Date, UTC, mInfo->c);
+    Lgm_Doy(Date, &sYear, &sMonth, &sDay, &sDoy);
+    JD = Lgm_JD(sYear, sMonth, sDay, UTC, LGM_TIME_SYS_UTC, mInfo->c);
+    if (verbose) {
+        printf("Hour:Minute:Second = %02d:%02d:%02d (UTC=%f)\n", hour, minute, second, UTC);
+        printf("JD = %f\n", JD);
+        }
 
     // Now set field options
     strcpy( IntModel,  arguments.IntModel );
@@ -175,9 +188,9 @@ int main( int argc, char *argv[] ){
     /*
      *  Qin-Denton parameters can be obtained automatically by date/time ....
      */
-    Lgm_get_QinDenton_at_JD( JD, &qd, 1 , 0);        // Get (interpolate) the QinDenton vals
-                                                    // from the values in the file at the
-                                                    // given Julian Date.
+    Lgm_get_QinDenton_at_JD( JD, &qd, verbose , 0);  // Get (interpolate) the QinDenton vals
+                                                     // from the values in the file at the
+                                                     // given Julian Date.
     Lgm_set_QinDenton( &qd, mInfo );                 // Set params in mInfo structure.
 
     // Grid to match ptm_tec_interp.py
