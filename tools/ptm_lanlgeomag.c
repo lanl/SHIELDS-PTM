@@ -235,7 +235,7 @@ int main( int argc, char *argv[] ){
             mkdir(dirname, 0700);
             }
         // E/B-Field output file
-        sprintf(buffer, "%s_%ld/ptm_fields_%04d.txt", model_str, Date, il);
+        sprintf(buffer, "%s_%ld/ptm_fields_%04d.dat", model_str, Date, il);
         FILE *fields = fopen(buffer, "w");
 
         // Write header
