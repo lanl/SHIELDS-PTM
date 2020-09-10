@@ -1,7 +1,0 @@
-2        idens
--7       xmin
--6       xmax
--0.5     ymin
-0.5      ymax
--0.5     zmin
-0.5      zmax

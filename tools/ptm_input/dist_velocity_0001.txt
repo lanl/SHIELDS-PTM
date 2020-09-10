@@ -1,9 +1,0 @@
-3        idist
-34       nenergy
-31       npitch
-180      phi
-1        emin
-100      emax
-0        pamin
-90       pamax
--12      xsource
