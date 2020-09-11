@@ -49,7 +49,7 @@ def getPosition(sat, targ_time, verbose=False):
     lat = data['Geographic_Latitude'][idx]
     rad = data['Rad_Re'][idx]
     cc = spc.Coords([rad, lat, lon], 'GEO', 'sph')
-    cc.ticks = spt.Ticktock(utc[idx])
+    cc.ticks = spt.Ticktock(data['UTC'][idx])
     pos = cc.convert('GSM', 'car')
 
     # Return position as a strnig that can be used in makeRun script
