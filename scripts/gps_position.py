@@ -107,7 +107,6 @@ if __name__ == '__main__':
 
     if opt.sat is None:
         sats = ['ns{}'.format(sn) for sn in range(54, 74)]
-        targ_time = dt.datetime(2017,9,6,13,15)
         for sat in sats:
             getPosition(sat, targ_time, verbose=True)
     else:
