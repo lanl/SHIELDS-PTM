@@ -338,13 +338,15 @@ if __name__ == '__main__':
     fluxmap_inst = copy.deepcopy(fluxmap)
     fluxmap_source = copy.deepcopy(fluxmap)
     # Get source spectrum from minimally-shielded CXD
-    targ = dt.datetime(2017, 9, 6, 13, 5)
-    obsdict = gps_position.getSpectrum('ns61', targ)
+    targ = dt.datetime(2017, 9, 8, 5, 5)
+    obsname = 'ns62'
+    obsdict = gps_position.getSpectrum(obsname, targ)
     obsdict['energy'] = obsdict['energy']*1000  # Convert energy from MeV to keV
     obsdict['flux'] = obsdict['flux']/1000  # Convert flux from per MeV to per keV
     fluxlim = 50  # MeV - lower limit for integration
     # Get target spectrum
-    obs = gpt.loadCXDascii(72, '17090*')
+    satnum = 68
+    obs = gpt.loadCXDascii(satnum, '17090*')
     idx = bisect.bisect_left(obs['UTC'], targ)
     obs_gt = interpolate.BSpline(*(interpolate.splrep(obs['proton_flux_fit_energy'][idx],
                                    obs['proton_flux_fit'][idx]))).integrate(np.min(fluxlim),np.max(800))
@@ -353,30 +355,34 @@ if __name__ == '__main__':
     omni_gyro = cxd.calculate_omni(fluxmap, source=obsdict, from_look=False)
     omni_inst = cxd.calculate_omni(fluxmap_inst, source=obsdict, fov=90, dir='east', from_look=True)
     # Get counts...
-    counts = cxd.get_counts(fluxmap['energies'], omni_inst, svn=72, low=10e3, high=500e3)
+    counts = cxd.get_counts(fluxmap['energies'], omni_inst, svn=satnum, low=10e3, high=500e3)
     # counts = cxd.get_counts(np.asarray(obs['proton_flux_fit_energy'][idx])*1e3,
     #                         np.asarray(obs['proton_flux_fit'][idx])/1e3,
     #                         svn=72, low=5e3, high=800e3)
     # Integral flux
     omn_gt = interpolate.BSpline(*(interpolate.splrep(fluxmap['energies'], omni_inst)
                                  )).integrate(np.min(fluxlim*1000),np.max(800000))
-    fig, axes = plot_omni(cxd, omni_inst, fluxmap_inst, label='ns72 predicted')
+    fig, axes = plot_omni(cxd, omni_inst, fluxmap_inst, label='ns{} predicted'.format(satnum))
     omni_source = cxd.calculate_omni(fluxmap_source, source=obsdict, initialE=True, from_look=False)
     print(">{}MeV: obs={}; pred={}".format(fluxlim, obs_gt, omn_gt))
-    add_extra_omni(axes[0], omni_source, fluxmap_source, label='Source (@ ns61)', color='green')
+    add_extra_omni(axes[0], omni_source, fluxmap_source, label='Source (@ {})'.format(obsname), color='green')
     ## Plot initial spectrum
     # axes[0].plot(obsdict['energy']/1000, obsdict['flux']*1000, 'k-.')
-    ## Plot expected, everything is omni flux _per steradian_
-    # axes[0].plot(obs['proton_flux_fit_energy'][idx], obs['proton_flux_fit'][idx], 'y:', label='ns72')
     axes[0].legend()
     ylims = axes[0].get_ylim()
     cdict = cxd.cutoff_info
     axes[0].plot(cdict['ec_low'], ylims[0], marker='^', mec='k', mfc='silver', clip_on=False)
     axes[0].plot(cdict['ec_high'], ylims[0], marker='^', mec='k', mfc='grey', clip_on=False)
     axes[0].set_ylim(ylims)
+    plt.savefig('flux_spectrum_ns{}_050500.png'.format(satnum))
+    # Plot expected, everything is omni flux _per steradian_
+    axes[0].plot(obs['proton_flux_fit_energy'][idx], obs['proton_flux_fit'][idx], 'y:', label='ns{}'.format(satnum))
+    plt.savefig('flux_spectrum_ns{}_050500_plus_obs.png'.format(satnum))
     # Now plot directional flux at 50 MeV
     plot_directional_flux(50e3, fluxmap, fluxmap_inst)
+    plt.savefig('directional_flux_50MeV_ns{}_050500.png'.format(satnum))
     # Now plot observedd vs predicted counts
     counts = np.array([cc for k, cc in counts.items() if k >= 12])
     plot_counts_pred_obs(counts, obs['rate_proton_measured'][idx])
+    plt.savefig('counts_ns{}_comp_{}_050500.png'.format(satnum, obsname))
     plt.show()
