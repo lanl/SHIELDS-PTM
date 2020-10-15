@@ -121,9 +121,9 @@ def setupGPS(opt, runid, nruns, verbose=False):
 
 def setupElec(opt, runid, nruns, verbose=False):
     # break energy space over number of runs...
-    emin = 50.0*1e-3  # 50eV lower limit
-    emax = 200.0*1e-3  # 200eV upper limit
-    nenergy = 30
+    emin = 100.0*1e-3  # 100eV lower limit
+    emax = 100.0  # 200eV upper limit
+    nenergy = 90
     energy_arr = np.linspace(emin, emax, nenergy)
     per_run = nenergy//nruns
 
@@ -151,7 +151,7 @@ def setupElec(opt, runid, nruns, verbose=False):
                              emax=earr['max'],  # Emax in keV
                              phi=-1.0,  # negative phi is randomly-seeded
                              nenergy=earr['n_e'],  # number of energies
-                             npitch=9,  # number of pitch angles
+                             npitch=18,  # number of pitch angles
                              pamin=0,
                              pamax=90,
                              xsource=-12.0
@@ -162,11 +162,11 @@ def setupElec(opt, runid, nruns, verbose=False):
                              itrace=-1,  # backwards in time
                              charge=-1.0, mass=1.0,  # electrons
                              dtin=opt.timestep,  # set delta between fields snapshots
-                             dtout=1.0, # 0.1s output written
+                             dtout=1.0, # 1.0s output written
                              thi=600.0, # max time of 600s
                              itraj=1,  # 1=write trajectories when in fluxmap mode
-                             ibound=2,  # 2=plane at fixed X
-                             rbound=-15.0,  # distance to stopping surface
+                             ibound=3,  # 2=plane at fixed X; 3=radial bound
+                             rbound=-6.6,  # distance to stopping surface
                              )
 
         # Define point source for tracing
