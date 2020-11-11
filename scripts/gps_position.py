@@ -9,7 +9,8 @@ import spacepy.datamodel as dm
 import spacepy.time as spt
 import spacepy.coordinates as spc
 
-import gpstools as gpt
+import gpstools.util
+import gpstools.response
 
 gpspath = '/n/space_data/LANL_GPS/Particle_Data/processed_ascii'
 
@@ -38,7 +39,7 @@ def getPosition(sat, targ_time, verbose=False):
     gpsfile = findDataFile(sat, targ_time)
     data = dm.readJSONheadedASCII(gpsfile)
     # Get UTC time
-    data['UTC'] = gpt.computeTime(data['year'], data['decimal_day']).UTC
+    data['UTC'] = gpstools.util.computeTime(data['year'], data['decimal_day']).UTC
     # Find time nearest to requested
     idx = bisect.bisect(data['UTC'], targ_time)
     d1 = np.abs((data['UTC'][idx-1]-targ_time).total_seconds())
@@ -67,7 +68,7 @@ def getSpectrum(sat, targ_time):
     gpsfile = findDataFile(sat, targ_time)
     data = dm.readJSONheadedASCII(gpsfile)
     # Get UTC time
-    data['UTC'] = gpt.computeTime(data['year'], data['decimal_day']).UTC
+    data['UTC'] = gpstools.util.computeTime(data['year'], data['decimal_day']).UTC
     # Find time nearest to requested
     idx = bisect.bisect(data['UTC'], targ_time)
     d1 = np.abs((data['UTC'][idx-1]-targ_time).total_seconds())
@@ -80,7 +81,7 @@ def getSpectrum(sat, targ_time):
 
 
 def get_response(svn):
-    response = gpt.response.read_response(svn, species='proton')
+    response = gpstools.response.read_response(svn, species='proton')
     return response
 
 
