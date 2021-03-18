@@ -101,7 +101,7 @@ int main( int argc, char *argv[] ){
 
     struct              Arguments arguments;
     int                 verbose, UseTS07=0;
-    char                IntModel[20], ExtModel[20];
+    char                IntModel[20], ExtModel[20], model_str[20];
     int                 i, j, k, sYear, sMonth, sDay, sDoy;
     int                 Year, Month, Day;
     long int            Date;
@@ -110,7 +110,7 @@ int main( int argc, char *argv[] ){
     Lgm_Vector          u, B;
     Lgm_MagModelInfo    *mInfo = Lgm_InitMagInfo(0);
     Lgm_QinDentonOne qd;
-    char model_str[] = "T96";
+    //char model_str[] = "T96";
     char buffer[256];
     char dirname[256];
 
@@ -157,6 +157,7 @@ int main( int argc, char *argv[] ){
     // Now set field options
     strcpy( IntModel,  arguments.IntModel );
     strcpy( ExtModel,  arguments.ExtModel );
+    strcpy( model_str, arguments.ExtModel );
     if ( !strcmp( ExtModel, "T87" ) ){
         mInfo->Bfield = Lgm_B_T87;
     } else if ( !strcmp( ExtModel, "CDIP" ) ){
@@ -261,6 +262,7 @@ int main( int argc, char *argv[] ){
                     u.x = xstart + (xfinal - xstart)/(n-1.0)*i;
                     u.y = ystart + (yfinal - ystart)/(n-1.0)*j;
                     u.z = zstart + (zfinal - zstart)/(n-1.0)*k;
+
                     // Call magnetic field function
                     mInfo->Bfield(&u, &B, mInfo);
                     // Write grid indices
