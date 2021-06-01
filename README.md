@@ -18,3 +18,7 @@ make
 
 To build the fortran only run `make ptm`, to build/install the Python module only run `make python`, and to convert the Markdown documents to PDF use `make docs`.
 The documentation conversion uses the Node.js `mdpdf` module, which can be installed using `npm install mdpdf -g`. PDF documentation is placed in the `docs` directory.
+
+### RKSUITE
+In addition to the basic RK4 integrator, SHIELDS-PTM provides an interface to the RKSUITE library allowing users to select higher-order, adaptive integrators.
+If these integrators are used, RKSUITE and its originators should be credited. For details, please see [rksuite_readme](src/rksuite_readme).
