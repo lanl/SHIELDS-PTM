@@ -5,7 +5,7 @@ module rksuite_90_prec
 !
 ! Authors: R.W. Brankin (NAG Ltd., Oxford, England)
 !          I. Gladwell  (Math Dept., SMU, Dallas, TX, USA)
-!          see main doc for contact details
+!          see rksuite_readme for contact details
 !
 integer, parameter :: wp = kind(1.d0) 
 
@@ -18,7 +18,7 @@ module rksuite_90
 !
 ! Authors: R.W. Brankin (NAG Ltd., Oxford, England)
 !          I. Gladwell  (Math Dept., SMU, Dallas, TX, USA)
-!          see main doc for contact details
+!          see rksuite_readme for contact details
 !
 use rksuite_90_prec, only:wp
 
@@ -132,7 +132,7 @@ subroutine machine_const(round_off,sqrrmc,cubrmc,sqtiny,outch)
 !
 ! Authors: R.W. Brankin (NAG Ltd., Oxford, England)
 !          I. Gladwell  (Math Dept., SMU, Dallas, TX, USA)
-!          see main doc for contact details
+!          see rksuite_readme for contact details
 !
 real(kind=wp), intent(out) :: round_off, sqrrmc, cubrmc, sqtiny
 integer, intent(out) :: outch
@@ -160,7 +160,7 @@ subroutine method_const(rk_method, a, b, c, bhat, r, e, ptr, no_of_stages, &
 !
 ! Authors: R.W. Brankin (NAG Ltd., Oxford, England)
 !          I. Gladwell  (Math Dept., SMU, Dallas, TX, USA)
-!          see main doc for contact details
+!          see rksuite_readme for contact details
 !
 integer, intent(in) :: rk_method
 real(kind=wp), intent(out) :: a(13,13), b(13), c(13), bhat(13), r(11,6), e(7)
@@ -594,7 +594,7 @@ subroutine setup_r1(comm,t_start,y_start,t_end,tolerance,thresholds, &
 !
 ! Authors: R.W. Brankin (NAG Ltd., Oxford, England)
 !          I. Gladwell  (Math Dept., SMU, Dallas, TX, USA)
-!          see main doc for contact details
+!          see rksuite_readme for contact details
 !
 real(kind=wp), intent(in) :: t_end, t_start                          !indep!
 real(kind=wp), intent(in) :: tolerance
@@ -857,7 +857,7 @@ subroutine collect_garbage_r1(comm)
 !
 ! Authors: R.W. Brankin (NAG Ltd., Oxford, England)
 !          I. Gladwell  (Math Dept., SMU, Dallas, TX, USA)
-!          see main doc for contact details
+!          see rksuite_readme for contact details
 !
 type(rk_comm_real_1d) :: comm
 !
@@ -934,7 +934,7 @@ recursive subroutine range_integrate_r1(comm,f,t_want,t_got,y_got,yderiv_got, &
 !
 ! Authors: R.W. Brankin (NAG Ltd., Oxford, England)
 !          I. Gladwell  (Math Dept., SMU, Dallas, TX, USA)
-!          see main doc for contact details
+!          see rksuite_readme for contact details
 !
 real(kind=wp), intent(in) :: t_want                                  !indep!
 real(kind=wp), intent(out) :: t_got                                  !indep!
@@ -1171,7 +1171,7 @@ recursive subroutine step_integrate_r1(comm,f,t_now,y_now,yderiv_now,flag)
 !
 ! Authors: R.W. Brankin (NAG Ltd., Oxford, England)
 !          I. Gladwell  (Math Dept., SMU, Dallas, TX, USA)
-!          see main doc for contact details
+!          see rksuite_readme for contact details
 !
 real(kind=wp), intent(out) :: t_now                                  !indep!
 integer, intent(out), optional :: flag
@@ -1565,7 +1565,7 @@ subroutine truerr_r1(comm,f,ier)
 !
 ! Authors: R.W. Brankin (NAG Ltd., Oxford, England)
 !          I. Gladwell  (Math Dept., SMU, Dallas, TX, USA)
-!          see main doc for contact details
+!          see rksuite_readme for contact details
 !
 type(rk_comm_real_1d), intent(inout) :: comm
 integer, intent(inout) :: ier
@@ -1697,7 +1697,7 @@ subroutine step_r1(comm,f,tnow,y,yp,stages,tol,htry,y_new,    &
 !
 ! Authors: R.W. Brankin (NAG Ltd., Oxford, England)
 !          I. Gladwell  (Math Dept., SMU, Dallas, TX, USA)
-!          see main doc for contact details
+!          see rksuite_readme for contact details
 !
 type(rk_comm_real_1d), intent(inout), target :: comm
 real(kind=wp), intent(out) :: err
@@ -1947,7 +1947,7 @@ subroutine stiff_r1(comm,f,toomch,sure_stiff)
 !
 ! Authors: R.W. Brankin (NAG Ltd., Oxford, England)
 !          I. Gladwell  (Math Dept., SMU, Dallas, TX, USA)
-!          see main doc for contact details
+!          see rksuite_readme for contact details
 !
 type(rk_comm_real_1d), intent(inout), target :: comm
 logical, intent(in) :: toomch
@@ -2330,7 +2330,7 @@ subroutine statistics_r1(comm,total_f_calls,step_cost,waste,num_succ_steps,&
 !
 ! Authors: R.W. Brankin (NAG Ltd., Oxford, England)
 !          I. Gladwell  (Math Dept., SMU, Dallas, TX, USA)
-!          see main doc for contact details
+!          see rksuite_readme for contact details
 !
 type(rk_comm_real_1d), intent(inout) :: comm
 real(kind=wp), optional, intent(out) :: h_next                       !indep!
@@ -2421,7 +2421,7 @@ subroutine global_error_r1(comm,rms_error,max_error,t_max_error)
 !
 ! Authors: R.W. Brankin (NAG Ltd., Oxford, England)
 !          I. Gladwell  (Math Dept., SMU, Dallas, TX, USA)
-!          see main doc for contact details
+!          see rksuite_readme for contact details
 !
 type(rk_comm_real_1d), intent(inout) :: comm
 real(kind=wp), optional, intent(out) :: max_error
@@ -2524,7 +2524,7 @@ subroutine reset_t_end_r1(comm,t_end_new)
 !
 ! Authors: R.W. Brankin (NAG Ltd., Oxford, England)
 !          I. Gladwell  (Math Dept., SMU, Dallas, TX, USA)
-!          see main doc for contact details
+!          see rksuite_readme for contact details
 !
 real(kind=wp), intent(in) :: t_end_new                               !indep!
 type(rk_comm_real_1d), intent(inout) :: comm
@@ -2615,7 +2615,7 @@ subroutine interpolate_r1(comm,f,t_want,y_want,yderiv_want)
 !
 ! Authors: R.W. Brankin (NAG Ltd., Oxford, England)
 !          I. Gladwell  (Math Dept., SMU, Dallas, TX, USA)
-!          see main doc for contact details
+!          see rksuite_readme for contact details
 !
 real(kind=wp), intent(in) :: t_want                                  !indep!
 type(rk_comm_real_1d), intent(inout), target :: comm
@@ -2947,7 +2947,7 @@ subroutine rkmsg_r1(ier,srname,nrec,comm,flag)
 !
 ! Authors: R.W. Brankin (NAG Ltd., Oxford, England)
 !          I. Gladwell  (Math Dept., SMU, Dallas, TX, USA)
-!          see main doc for contact details
+!          see rksuite_readme for contact details
 !
 integer, intent(in) :: ier, nrec
 integer, intent(out), optional :: flag
@@ -3033,7 +3033,7 @@ subroutine set_saved_state_r1(srname,state,comm)
 !
 ! Authors: R.W. Brankin (NAG Ltd., Oxford, England)
 !          I. Gladwell  (Math Dept., SMU, Dallas, TX, USA)
-!          see main doc for contact details
+!          see rksuite_readme for contact details
 !
 integer, intent(in) :: state
 type(rk_comm_real_1d), intent(inout) :: comm
@@ -3066,7 +3066,7 @@ function get_saved_state_r1(srname,save_states)
 !
 ! Authors: R.W. Brankin (NAG Ltd., Oxford, England)
 !          I. Gladwell  (Math Dept., SMU, Dallas, TX, USA)
-!          see main doc for contact details
+!          see rksuite_readme for contact details
 !
 integer, dimension(7), intent(inout) :: save_states
 character(len=*), intent(in) :: srname
@@ -3104,7 +3104,7 @@ function get_saved_fatal_r1(comm)
 !
 ! Authors: R.W. Brankin (NAG Ltd., Oxford, England)
 !          I. Gladwell  (Math Dept., SMU, Dallas, TX, USA)
-!          see main doc for contact details
+!          see rksuite_readme for contact details
 !
 type(rk_comm_real_1d), intent(in) :: comm
 logical :: get_saved_fatal_r1
@@ -3136,7 +3136,7 @@ function get_stop_on_fatal_r1(comm)
 !
 ! Authors: R.W. Brankin (NAG Ltd., Oxford, England)
 !          I. Gladwell  (Math Dept., SMU, Dallas, TX, USA)
-!          see main doc for contact details
+!          see rksuite_readme for contact details
 !
 type(rk_comm_real_1d), intent(in) :: comm
 logical get_stop_on_fatal_r1
