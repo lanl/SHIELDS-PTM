@@ -1,4 +1,4 @@
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4891973.svg)](https://doi.org/10.5281/zenodo.4891973)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4891973.svg)](https://doi.org/10.5281/zenodo.4891973) [![ptm-ci](https://github.com/lanl/SHIELDS-PTM/actions/workflows/ptm-ci.yml/badge.svg)](https://github.com/lanl/SHIELDS-PTM/actions/workflows/ptm-ci.yml)
 
 # PTM - The SHIELDS Particle Tracing Model
 The SHIELDS Particle Tracing Model (PTM) is a large-scale particle tracing code, primarily intended for magnetospheric
