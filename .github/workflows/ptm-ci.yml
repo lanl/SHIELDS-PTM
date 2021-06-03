@@ -11,35 +11,27 @@ on:
   workflow_dispatch:
 
 jobs:
-  install-packages:
+  basic-suite:
     runs-on: ubuntu-18.04
     steps:
     - name: Install dependencies
       run: |
         sudo apt-get update -qq
         sudo apt-get install -y make gfortran gcc g++
-        sudo apt-get install -y python3-pip
+        sudo apt-get install -y python3-pip python3-setuptools python3-wheel
         pip3 install numpy scipy matplotlib
         pip3 install spacepy
-        pip freeze
+        pip3 freeze
         gfortran --version
     - name: Checkout
       uses: actions/checkout@v2
-
-  build-ptm:
-    runs-on: ubuntu-18.04
-    needs: [install-packages]
-    steps:
-      - run: shopt -s expand_aliases
-      - run: alias python="python3"
-      - run: make
-      - run: ./ptm 1
-
-  test-dipole:
-    runs-on: ubuntu-18.04
-    needs: [install-packages]
-    steps:
-      - run: shopt -s expand_aliases
-      - run: alias python="python3"
-      - run: make
-      - run: python ptm_python/ptm_test_data.py
+    - name: build-ptm
+      run: |
+        make ptm
+        ./ptm 1
+    - name: test-dipole
+      run: |
+        make clean
+        make ptm
+        python3 setup.py install --user
+        python3 ptm_python/ptm_test_data.py
