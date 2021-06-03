@@ -25,13 +25,16 @@ jobs:
         gfortran --version
     - name: Checkout
       uses: actions/checkout@v2
-    - name: build-ptm
+    - name: ptm-regress
       run: |
         make ptm
         ./ptm 1
+        cmp ptm_output/ptm_0001.dat ptm_output/ptm_0001.expected
     - name: test-dipole
       run: |
         make clean
         make ptm
         python3 setup.py install --user
         python3 ptm_python/ptm_test_data.py
+    - name: test-postproc
+      run: python3 ptm_python/test_ptm.py
