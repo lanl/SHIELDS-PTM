@@ -1,0 +1,45 @@
+name: ptm-ci
+on:
+  # Trigger the workflow on push or pull request,
+  # but only for the main branch
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+  workflow_dispatch:
+
+jobs:
+  install-packages:
+    runs-on: ubuntu
+    steps:
+    - name: Install dependencies
+      run: |
+        sudo apt-get update -qq
+        sudo apt-get install -y make gfortran gcc g++
+        sudo apt-get install -y python3-pip
+        pip3 install numpy scipy matplotlib
+        pip3 install spacepy
+        pip freeze
+        gfortran --version
+    - name: Checkout
+      uses: actions/checkout@v2
+
+  build-ptm:
+    runs-on: ubuntu-18.04
+    needs: [install-packages]
+    steps:
+      - run: shopt -s expand_aliases
+      - run: alias python="python3"
+      - run: make
+      - run: ./ptm 1
+
+  test-dipole:
+    runs-on: ubuntu-18.04
+    needs: [install-packages]
+    steps:
+      - run: shopt -s expand_aliases
+      - run: alias python="python3"
+      - run: make
+      - run: python ptm_python/ptm_test_data.py
