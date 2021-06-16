@@ -2,8 +2,7 @@
 This file contains routines used to read in data from the SHIELDS-PTM particle tracing
 simulation as well as to calculate quantities based on the particle data.
 
-Jesse Woodroffe, Steven Morley
-last revised May 2020
+Authors: Jesse Woodroffe, Steven Morley
 """
 
 import os
@@ -79,6 +78,42 @@ class Proton(Particle):
     def __init__(self, energy):
         self.energy = energy
         super().__init__()
+
+
+class StormerVertical():
+    def __init__(self, cd_moment=29950.126):
+        """
+        Parameters
+        ==========
+        cd_moment : float
+            Centered dipole moment of epoch in nT. Can, for example, be obtained
+            from spacepy.igrf (after instantiation, the value is in the moment
+            attribute). Default is the dipole moment for the 2010 epoch.
+        """
+        self.set_coefficient(cd_moment)
+    
+    def set_coefficient(self, cd_moment):
+        re_cm = 6371.0008*1e5  # Volumetric radius in cm
+        mom_gauss_cm3 = (cd_moment/1e5)*re_cm**3
+        gauss_cm = mom_gauss_cm3/re_cm**2
+        # Now apply unit conversion, eV to Gev and volts to abvolts
+        coeff = 300*gauss_cm/1e9
+        self.coeff = coeff/4  # vertical reduction
+
+    def cutoff_at_L(self, l_value, as_energy=False):
+        """
+        Parameters
+        ==========
+        l_value : float
+            L at which to evaulate the cutoff
+        as_energy : bool
+            If True, express the cutoff as proton energy in MeV.
+            Default is False, giving the cutoff in GV (rigidity).
+        """
+        cutoff = self.coeff/l_value**2
+        if as_energy:
+            return Proton.fromRigidity(cutoff).energy
+        return cutoff
 
 
 @contextmanager
