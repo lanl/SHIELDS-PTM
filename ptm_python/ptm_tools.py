@@ -14,6 +14,7 @@ from scipy import special
 
 
 ckm = constants.speed_of_light/1e3
+re_cm = 6371.0008*1e5  # Volumetric Earth radius in cm
 
 
 class newDict(dict):
@@ -89,11 +90,27 @@ class StormerCutoff():
             Centered dipole moment of epoch in nT. Can, for example, be obtained
             from spacepy.igrf (after instantiation, the value is in the moment
             attribute). Default is the dipole moment for the 2010 epoch.
+
+        References
+        ==========
+        - Stormer, C. The Polar Aurora. Clarendon Press, Oxford, 1955.
+        - Smart, D. F. and Shea, M. A., “The Change in Geomagnetic Cutoffs Due to
+          Changes in the Dipole Equivalent of the Earth's Magnetic Field”, in
+          23rd International Cosmic Ray Conference (ICRC23), Volume 3, 1993, p. 781.
         """
         self.set_coefficient(cd_moment)
 
     def set_coefficient(self, cd_moment):
-        re_cm = 6371.0008*1e5  # Volumetric radius in cm
+        """Set rigidity coefficient as dipole moment in mixed units
+
+        See section 2 of Smart and Shea (1993).
+
+        References
+        ==========
+        - Smart, D. F. and Shea, M. A., “The Change in Geomagnetic Cutoffs Due to
+          Changes in the Dipole Equivalent of the Earth's Magnetic Field”, in
+          23rd International Cosmic Ray Conference (ICRC23), Volume 3, 1993, p. 781.
+        """
         mom_gauss_cm3 = (cd_moment/1e5)*re_cm**3
         gauss_cm = mom_gauss_cm3/re_cm**2
         # Now apply unit conversion, eV to Gev and volts to abvolts
@@ -111,7 +128,7 @@ class StormerCutoff():
             Angle from the zenith (i.e., from radially outward) [degrees]
         eta : float
             Azimuth angle [degrees]. Positive clockwise with zero in the direction of
-            the dipole axis (north).
+            the dipole axis (north). Arrival from East = 90; from West = 270.
         as_energy : bool
             If True, express the cutoff as proton energy in MeV.
             Default is False, giving the cutoff in GV (rigidity).
@@ -123,6 +140,15 @@ class StormerCutoff():
         cutoff : float
             Geomagnetic cutoff at given dipole L. Units are in GV,
             unless "as_energy" is True when units are in MeV.
+
+        Example
+        =======
+        >>> sc = StormerCutoff()
+        >>> # zenith angle = 90 so that arrival is perp to zenith
+        >>> c_east = sc.cutoff_at_L(1, 90, 90)  # az. is 90 meaning East
+        >>> c_west = sc.cutoff_at_L(1, 90, 270)  # west
+        >>> print(c_east, c_west)  # in GV
+        57.24368301183024 9.821463284457387
         """
         lamb = invariant_latitude_from_l(l_value, degrees=False)
         epsi = np.deg2rad(zenith)
@@ -160,15 +186,15 @@ class StormerVertical(StormerCutoff):
 
 
 def invariant_latitude_from_l(l_value, degrees=True):
-    '''Get invariant latitude from dipole L value
+    '''Get invariant latitude from dipole/McIlwain L value
 
     Parameters
     ==========
     l_value : float
-        Dipole L value
+        Dipole (or McIlwain) L value
     degrees : bool
-        If True (default) return latitude in degrees. Otherwise
-        return in radians.
+        If True (default) return invariant latitude in degrees.
+        Otherwise return in radians.
 
     Returns
     =======
@@ -184,7 +210,8 @@ def invariant_latitude_from_l(l_value, degrees=True):
 
 
 def l_from_invariant_latitude(lati):
-    '''
+    '''Get L from the invariant latitude
+
     Parameters
     ==========
     lati : float
@@ -193,7 +220,7 @@ def l_from_invariant_latitude(lati):
     Returns
     =======
     l_val : float
-        Dipole L value
+        Dipole/McIlwain L value
     '''
     lat_rad = np.deg2rad(lati)
     l_val = 1/np.cos(lat_rad)**2
