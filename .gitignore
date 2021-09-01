@@ -6,3 +6,5 @@ ptm
 build
 dist
 ptm_output/*.dat
+docs
+mdpdf.log

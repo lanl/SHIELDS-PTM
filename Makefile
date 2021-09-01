@@ -46,13 +46,16 @@ clean-python:
 	rm -rf build/
 	rm -rf dist/
 
-# Build docs in PDF. Uses mdpdf (a Node.js module)
+# Build docs in PDF. Uses mdpdf (a pip-installable python tool)
 docs:
-	mdpdf PTM_HowToRun.md
-	mdpdf README.md
 	[ -d docs ] || mkdir docs/
-	mv PTM_HowToRun.pdf docs/
-	mv README.pdf docs/
+	tail -n +2 README.md > tmpreadme
+	sed -i 's/\[rksuite_readme\](src\/rksuite_readme)/rksuite readme/g' tmpreadme
+	mdpdf -o docs/PTM_HowToRun.pdf PTM_HowToRun.md
+	mdpdf -o docs/README.pdf tmpreadme
+	rm -f tmpreadme
+	mdpdf -o docs/PTM_Docs.pdf PTM_Docs.md
 
 clean-docs:
 	rm -rf docs
+	rm -f mdpdf.log
