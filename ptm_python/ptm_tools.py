@@ -122,11 +122,11 @@ class StormerCutoff():
         """
         Parameters
         ==========
-        l_value : float
+        l_value : float or array of floats
             L at which to evaulate the cutoff
-        zenith : float
+        zenith : float or array of floats
             Angle from the zenith (i.e., from radially outward) [degrees]
-        eta : float
+        azimuth : float or array of floats
             Azimuth angle [degrees]. Positive clockwise with zero in the direction of
             the dipole axis (north). Arrival from East = 90; from West = 270.
         as_energy : bool
@@ -137,7 +137,7 @@ class StormerCutoff():
 
         Returns
         =======
-        cutoff : float
+        cutoff : float or array of floats
             Geomagnetic cutoff at given dipole L. Units are in GV,
             unless "as_energy" is True when units are in MeV.
 
@@ -150,13 +150,26 @@ class StormerCutoff():
         >>> print(c_east, c_west)  # in GV
         57.24368301183024 9.821463284457387
         """
-        lamb = invariant_latitude_from_l(l_value, degrees=False)
+        sh_zen = np.atleast_1d(zenith).shape
+        sh_azi = np.atleast_1d(azimuth).shape
+        l_vals = np.asarray(l_value)
+        sh_l = np.atleast_1d(l_vals).shape
+        ze_az = np.logical_or(sh_zen == sh_azi, np.logical_and(sh_zen == 1, sh_azi == 1))
+        lv = np.logical_or(sh_l == sh_zen, sh_zen == (1,))
+        allsame = np.logical_and(lv, ze_az)
+        if not allsame:
+            raise ValueError('{} {}'.format(lv, ze_az))
+        lamb = invariant_latitude_from_l(l_vals, degrees=False)
         epsi = np.deg2rad(zenith)
         eta = np.deg2rad(azimuth)
         denom = (1 + np.sqrt(1 - np.sin(epsi) * np.sin(eta) * np.cos(lamb)**3))**2
-        cutoff = self.moment_mixunits/(l_value**2 * denom)
+        cutoff = self.moment_mixunits/(l_vals**2 * denom)
         if as_energy:
-            return particle.fromRigidity(cutoff).energy
+            try:
+                return particle.fromRigidity(cutoff).energy
+            except ValueError:
+                e_arr = np.array([particle.fromRigidity(cc).energy for cc in cutoff])
+                return np.squeeze(e_arr)
         return cutoff
 
 
@@ -165,7 +178,7 @@ class StormerVertical(StormerCutoff):
         """
         Parameters
         ==========
-        l_value : float
+        l_value : float or array of floats
             L at which to evaulate the cutoff
         as_energy : bool
             If True, express the cutoff as proton energy in MeV.
@@ -175,13 +188,18 @@ class StormerVertical(StormerCutoff):
 
         Returns
         =======
-        cutoff : float
+        cutoff : float or array of floats
             Geomagnetic cutoff at given dipole L. Units are in GV,
             unless "as_energy" is True when units are in MeV.
         """
-        cutoff = self.coeff_v/l_value**2
+        l_vals = np.asarray(l_value)
+        cutoff = self.coeff_v/l_vals**2
         if as_energy:
-            return particle.fromRigidity(cutoff).energy
+            try:
+                return particle.fromRigidity(cutoff).energy
+            except ValueError:
+                e_arr = np.array([particle.fromRigidity(cc).energy for cc in cutoff])
+                return np.squeeze(e_arr)
         return cutoff
 
 
@@ -202,7 +220,11 @@ def invariant_latitude_from_l(l_value, degrees=True):
         Invariant latitude
     '''
     radi = 1  # latitude at Earth's surface
-    lati = np.arccos(np.sqrt(radi/l_value))
+    try:
+        ronl = radi/l_value
+    except TypeError:
+        ronl = radi/np.atleast_1d(l_value)
+    lati = np.arccos(np.sqrt(ronl))
     if degrees:
         return np.rad2deg(lati)
     else:
