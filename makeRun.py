@@ -29,8 +29,8 @@ def setupGPS(opt, runid, nruns, verbose=False):
     # get timesteps available in ptm_data directory
     gterm = os.path.join(indir, 'ptm_fields*dat')
     cands = glob.glob(gterm)
-    cands = [re.search('(\d{4})', cc) for cc in cands]
-    cands = [int(cc.group()) for cc in cands]
+    cands = [re.search('ptm_fields_(\d{4})', cc) for cc in cands]
+    cands = [int(cc.group().split("_")[-1]) for cc in cands]
     step1 = min(cands)
     stepN = max(cands)
     tgrid = np.loadtxt(os.path.join(indir, 'tgrid.dat'))
