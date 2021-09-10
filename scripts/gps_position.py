@@ -12,7 +12,7 @@ import spacepy.coordinates as spc
 import gpstools.util
 import gpstools.response
 
-gpspath = '/n/space_data/LANL_GPS/Particle_Data/processed_ascii'
+gpspath = '/n/space_data/LANL_GPS'
 
 
 def findDataFile(sat, targ_time, version='1.08'):
@@ -24,7 +24,7 @@ def findDataFile(sat, targ_time, version='1.08'):
         day = int(wkstr[4:6])
         return dt.datetime(year, mon, day)
     # Get all filenames for this satellite and convert week start to date
-    allfiles = sorted(glob.glob(os.path.join(gpspath, sat, '*_v{}.ascii'.format(version))))
+    allfiles = sorted(glob.glob(os.path.join(gpspath, sat, 'CXD/processed_ascii/*_v{}.ascii'.format(version))))
     weekstrs = [re.search('(?<=_)\d{6}', fn).group(0) for fn in allfiles]
     weekdates = [wkstr_to_date(wk) for wk in weekstrs]
     # Find where the requested date would be inserted
