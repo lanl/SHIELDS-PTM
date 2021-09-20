@@ -1,4 +1,3 @@
-
 export OMP_NUM_THREADS=20
 
 # Directory to save the runs to
@@ -7,8 +6,8 @@ runsdir='/projects/lanl/Carrington/ModelOutputs/PTM/test'
 # Directory to save the fields to
 fieldsdir='/projects/lanl/Carrington/ModelInputs/PTMFields/test'
 
-# Directory for PTM (should probably get this automatically?)
-ptmdir='/home/mengel/github/SHIELDS-PTM'
+# Directory for PTM
+ptmdir=`pwd`
 
 # Date to run
 date='20170907_050000'
@@ -81,7 +80,9 @@ for d in $dates; do
       dir=$runsdir/$d-$model-ns$sat
       cd $dir
       bash job_script.sh
-      cd ..
+      cd $ptmdir
+      echo python3 $ptmscripts/PTMtoHDF5.py $dir
+      python3 $ptmscripts/PTMtoHDF5.py $dir
     done
   done
 done
