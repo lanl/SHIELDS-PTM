@@ -284,14 +284,14 @@ def parse_trajectory_file(fname):
         if line.startswith('#'):
             # Starts a particle output section, grab particle ID
             if idx != 0:
-                dataDict[pnum] = np.array(parr, dtype=np.float)
+                dataDict[pnum] = np.array(parr, dtype=float)
             pnum = int(line.split()[1])
             parr = []
         else:
             # Get data associated with particle
             parr.append(line.split())
     # put last particle into output dict
-    dataDict[pnum] = np.array(parr, dtype=np.float)
+    dataDict[pnum] = np.array(parr, dtype=float)
 
     return dataDict
 
@@ -323,7 +323,7 @@ def parse_map_file(fnames):
     envec = np.sort(np.unique(lines[:, 4]))
 
     sourcepos = header.strip().split()[-3:]
-    fluxmap = newDict(attrs={'position': np.array(sourcepos, dtype=np.float)})
+    fluxmap = newDict(attrs={'position': np.array(sourcepos, dtype=float)})
     fluxmap['energies'] = envec
     fluxmap['angles'] = pavec
 
