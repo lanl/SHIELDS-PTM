@@ -2,8 +2,8 @@ PYEXE = `which python3`
 PROG = ptm
 F90 = gfortran
 OPT = -ffree-form -ffree-line-length-none -std=f2008ts -fopenmp -O3
-# For debug with GNU compiler, use -g flag
-# OPT = -ffree-form -ffree-line-length-none -std=f2008ts -fopenmp -g
+# For debug with GNU compiler, use -g flag; for runtime checks use -fcheck
+# OPT = -ffree-form -ffree-line-length-none -std=f2008ts -fopenmp -g -fcheck=all
 
 SRCS := $(wildcard src/*.f90)
 OBJS := $(patsubst %.f90,%.o,$(SRCS))

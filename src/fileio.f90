@@ -82,7 +82,7 @@ contains
   implicit none
 
   type(particle) :: myParticle
-  real(dp), dimension(8), intent(out) :: dataStore
+  real(dp), dimension(:), intent(out) :: dataStore
   real(dp), dimension(3) :: bvec, bhat, xpos, gradb, rvec
   real(dp), dimension(3,3) :: Bgrad
   real(dp) :: b0, upara, uperp, gam
