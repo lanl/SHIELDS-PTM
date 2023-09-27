@@ -200,9 +200,9 @@ contains
   ! Calculate the interpolation coefficients for an interpolant object
   implicit none
   
-  real(dp), dimension(64) :: myCoeffs
+  real(dp), dimension(:) :: myCoeffs
   type(grid) :: myGrid
-  real(dp), dimension(2,2,2), intent(in) :: F,FX,FY,FZ,FXY,FXZ,FYZ,FXYZ
+  real(dp), dimension(:,:,:), intent(in) :: F,FX,FY,FZ,FXY,FXZ,FYZ,FXYZ
   real(dp), dimension(64) :: bbar
   integer :: ix, iy, iz, irow
        
@@ -243,7 +243,7 @@ contains
   ! the function by including the optional gradf vector.
   implicit none
 
-  real(dp), dimension(64) :: myCoeffs
+  real(dp), dimension(:) :: myCoeffs
   type(grid) :: myGrid
   real(dp), intent(in) :: x0, y0, z0
   real(dp), intent(out) :: f0

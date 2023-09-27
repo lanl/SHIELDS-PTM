@@ -49,8 +49,8 @@ contains
 
   implicit none
 
-  real(dp), dimension(3) :: x
-  real(dp), dimension(3) :: f
+  real(dp), dimension(:) :: x
+  real(dp), dimension(:) :: f
   real(dp) :: A, B, p, q, dxp, dxm, dxtot, dfp, dfm, denom
   real(dp) :: der
   integer, intent(in) :: idx
@@ -105,8 +105,8 @@ contains
   !
   implicit none
 
-  real(dp), dimension(3), intent(in) :: x, y
-  real(dp), dimension(3,3), intent(in) :: f
+  real(dp), dimension(:), intent(in) :: x, y
+  real(dp), dimension(:,:), intent(in) :: f
   real(dp), dimension(3) :: temp  
   real(dp) :: der
   integer, intent(in) :: idx, idy
@@ -146,8 +146,8 @@ contains
   !
   implicit none
 
-  real(dp), intent(in), dimension(3) :: x, y, z
-  real(dp), intent(in), dimension(3,3,3) :: f
+  real(dp), intent(in), dimension(:) :: x, y, z
+  real(dp), intent(in), dimension(:,:,:) :: f
   real(dp), dimension(3) :: temp
   real(dp) :: der
   integer, intent(in) :: idx, idy, idz
