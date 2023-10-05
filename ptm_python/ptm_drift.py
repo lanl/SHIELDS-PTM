@@ -29,8 +29,8 @@ def aux_drift(alpha, var='T'):
         num = lambda x: np.sin(x)*np.sqrt(1+3*np.cos(x)**2)
         den = lambda x: np.sqrt(1-mu*mu*np.sqrt(1+3*np.cos(x)**2)/np.sin(x)**6)
     elif var == 'E':
-        num = lambda x: (np.sin(x)**3*(1+np.cos(x)**2))*(1-0.5*mu*mu*np.sqrt(1+3*cos(x)**2)/np.sin(x)**6)
-        den = lambda x: (1+3*np.cos(x)**2)**(3/2)*np.sqrt(1-mu*mu*np.sqrt(1+3*cos(x)**2)/np.sin(x)**6)
+        num = lambda x: (np.sin(x)**3*(1+np.cos(x)**2))*(1-0.5*mu*mu*np.sqrt(1+3*np.cos(x)**2)/np.sin(x)**6)
+        den = lambda x: (1+3*np.cos(x)**2)**(3/2)*np.sqrt(1-mu*mu*np.sqrt(1+3*np.cos(x)**2)/np.sin(x)**6)
     else:
         raise ValueError('Only "T" or "E" are valid identifiers. "{}" was provided.'.format(var))
     res = integrate.quad(lambda x: num(x)/den(x), thetac, np.pi/2)[0]
