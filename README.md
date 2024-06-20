@@ -17,7 +17,7 @@ boundary for inner magnetosphere modeling, and determining access of solar energ
 
 This code is approved for open source release by Los Alamos National Laboratory and has been assigned reference number C21002.
 
-### Attribution
+## Attribution
 The following people have contributed to the edvelopment of SHIELDS-PTM:
 Jesse Woodroffe [1], Steven Morley [1], Thiago Brito [1], Alin-Daniel Panaitescu [2], Miles Engel [1], Michael Henderson [1], Vania Jordanova [1]
 
@@ -30,7 +30,7 @@ A paper describing the code is forthcoming, but until this is updated the best r
 - [Jordanova et al., Specification of the near-Earth space environment with SHIELDS, JASTP, 2018](https://doi.org/10.1016/j.jastp.2017.11.006)
 - [Brito et al., Particle tracing modeling of ion fluxes at geosynchronous orbit, JASTP, 2018](https://doi.org/10.1016/j.jastp.2017.10.008)
 
-### About the code
+## About the code
 This repository contains the simulation code and analysis tools for the SHIELDS particle tracing model (PTM).
 
 The main source is written in Fortran2008. Associated scripts, pre-processing, and post-processing are written in Python 3.
@@ -41,8 +41,8 @@ make
 ```
 
 To build the fortran only run `make ptm`, to build/install the Python module only run `make python`, and to convert the Markdown documents to PDF use `make docs`.
-The documentation conversion uses the Node.js `mdpdf` module, which can be installed using `npm install mdpdf -g`. PDF documentation is placed in the `docs` directory.
+The documentation conversion uses the Python `mdpdf` module, which can be installed using `pip install mdpdf`. PDF documentation is placed in the `docs` directory.
 
-### Use of RKSUITE
+## Use of RKSUITE
 In addition to the basic RK4 integrator, SHIELDS-PTM provides an interface to the RKSUITE library allowing users to select higher-order, adaptive integrators.
 If these integrators are used, RKSUITE and its originators should be credited. For details, please see [rksuite_readme](src/rksuite_readme).

@@ -1,55 +1,89 @@
+# SHIELDS-PTM: Particle Tracing Model
 
+## Installing SHIELDS-PTM
+SHIELDS-PTM is developed under version control at https://github.com/lanl/SHIELDS-PTM
+Tagged releases are also archived at Zenodo. The latest release is always accessible via
+https://doi.org/10.5281/zenodo.4891973
 
-A. Preparing PTM input files
+Once the desired version of the code is obtained, simply follow the instructions in ```README.md```.
+The python module can also be installed using the standard ```python setup.py install``` if desired.
+Test status for the SHIELDS-PTM code is displayed at the github repository, but to ensure that the
+code runs locally, we provide a simple test case. After compilation, simply run ```./ptm 1```
+To use the ```ptm_python``` module, simply ```import ptm_python``` in your interpreter or script.
 
-   Python3 scripts and modules to prepare PTM input files are in directory ptm_python/
-   Some more specialized scripts for specific applications are in directory scripts/
-   Create directories ptm_data/ and ptm_input/ and keep there the magnetic-field-model files
+## Using SHIELDS-PTM
+### Preparing PTM input files
 
-   Module ptm_preprocessing.py
-   1. creates in directory [rundir/]ptm_data/
-      a. a time-array "tgrid.bin" with epochs of all input n>1 .mhd files (select their cadence "dtout"),
-        (this time-grid will be used only if dtIn=<0 in file "ptm_parameters", see below for PTM input).
-      b. a uniform "x/y/zgrid.bin" for E&B (choose wanted spatial grid on lines 21-23 and the number of nodes).
-   2. calls "ptm_read.py" to read input ascii files ".mhd" (at all n epochs).
-      The Tecplot format files must use a specific output format (currently not documented, probably `3d MHD tec`)
-      A nominal column layout is given here:
-       x   y   z   rho    ux   uy   uz    bx  by  bz   P    jx     jy     jz
-       RE  RE  RE  Mp/cc  km/s km/s km/s  nT  nT  nT   nPa  muA/m2 muA/m2 muA/m2
-      The IDL format files use the flexible reader from SpacePy and hence any supported format
-      can be used.
-   3. calls function "gauss_interp_EB" of module "ptm_interpolate.py"
-      a. to interpolate B from the SWMF mesh (of .mhd) to the uniform XYZ grid created above (1b)
-      b. to calculate electric field E=-uxB and write files "e(x,y,z)3d_????.bin"
-   1  c. write files "b(x,y,z)3d_????.bin" at all n input epochs
+Python functions and classes used to prepare PTM input files are in the ```ptm_python``` module.
+Some more specialized, or targeted, scripts for specific applications are in the ```scripts```
+directory.
 
-   IMPORTANT: The B/E data_input files do not contain the XYZ grid. You must use XYZ and B/E files
-      that were both created with same run of `ptm_preprocessing.py`
+For a run, a run directory should be created. This can have any name and should contain directories
+named ```ptm_data```, ```ptm_input```, and ```ptm_out```. It should also contain a soft-link to the
+```ptm``` executable.
 
-   Module `ptm_input.py` will generate run configuration files in directory ptm_input/
-    a. file "ptm_parameters_????.txt" (with ????=4-digit zero-padded runid above) containing global pars:
-         number of particles, number of nx,ny,nz cells, number of timesteps
-         cadence in output trajectory file ptm_output/ptm_????.dat
-         cadence of input E&B files in ptm_data (note that the 4-digit number on these files
-         indicates the timestep, and these files are used by ALL runs)
-         indices ifirst and ilast of first/last epochs of E&B files to be read by PTM, etc.
-       IMPORTANT:  Choose these global pars and make sure that the spatial grid has same number of nodes 
-                   nx*ny*nz as outputted by module `ptm_preprocessing.py` in "ptm_parameters" file (see 1b above).
-    b. file "dist_density_????.txt" with parameters for the spatial distribution:
-       first line:
-         idens=1 -> single-location in RE
-         idens=2 -> cube corners in RE
-         idens=3 -> fixed radial distance in RE in equatorial plane, MLT range in hours
-    c. file "dist_velocity_????.txt" with parameters for the energy/PA distributions:
-       first line:
-         idist=1 -> single E/keV, single PA/deg, single or random phase angle
-         idist=2 -> vtperp and vtpara in km/s, single or random phase angle
-         idist=3 -> uniform flux-map mode: # of Energies, # of PitchAngles, gyropase phi, low/high E/PA
-         idist=4 -> user-specified flux map mode: as above (first three)
+The run directory should be set up with the following structure:
+```
+.
++-- rundir
+    |   `-- ptm
+    +-- ptm_input
+    |   |-- ptm_parameters_rrrr.txt
+    |   |-- dist_density_rrrr.txt
+    |   `-- dist_velocity_rrrr.txt
+    +-- ptm_data
+    |   |-- ptm_fields_nnnn.txt
+    |   |-- tgrid.dat
+    |   |-- energies_rrrr.bin
+    |   `-- pitchangles_rrrr.bin
+    `-- ptm_output
+```
+The ```rrrr``` is a 4-digit, zero-padded _run_ number, in case the simulation is partitioned into multiple runs.
+The ```nnnn``` is a 4-digit, zero-padded _timestep_ for the input fields file. Note that for a static field, two identical timesteps should be supplied.
 
-    IMPORTANT: For each of the 3 switches above (runid, idens, idist), set all parameters (after -> above).               
-     Alternatively, you can just edit existing files in dir ptm_input/ and remember that PTM will read the 
-     three input files that have the N=runid specified when PTM is run.
+- If using SWMF/BATSRUS electric and magnetic fields, use ```ptm_python/ptm_preprocessing.py``` as a script to generate the fields and time grid files, and note that the preferred format is the 3D "IDL" files. The preprocessing script can also use the ```3D MHD tec``` output from BATSRUS.
+- If using semi-empirical magnetic field models, use the ```ptm_lanlgeomag``` command-line program in the ```tools``` directory. This requires that the LANLGeoMag library is installed. LANLGeoMag is available from https://github.com/drsteve/LANLGeoMag
+
+Full details of the file specifications are given in the File Formats section of this document.
+
+#### ptm_preprocessing.py
+
+2. calls "ptm_read.py" to read input ascii files ".mhd" (at all n epochs).
+   The Tecplot format files must use a specific output format (currently not documented, probably `3d MHD tec`)
+   A nominal column layout is given here:
+    x   y   z   rho    ux   uy   uz    bx  by  bz   P    jx     jy     jz
+    RE  RE  RE  Mp/cc  km/s km/s km/s  nT  nT  nT   nPa  muA/m2 muA/m2 muA/m2
+   The IDL format files use the flexible reader from SpacePy and hence any supported format
+   can be used.
+3. calls function "gauss_interp_EB" of module "ptm_interpolate.py"
+   a. to interpolate B from the SWMF mesh (of .mhd) to the uniform XYZ grid created above (1b)
+   b. to calculate electric field E=-uxB and write files "e(x,y,z)3d_????.bin"
+1  c. write files "b(x,y,z)3d_????.bin" at all n input epochs
+
+Module ```ptm_input.py``` will generate run configuration files in directory ptm_input/
+ a. file "ptm_parameters_????.txt" (with ????=4-digit zero-padded runid above) containing global pars:
+      number of particles, number of nx,ny,nz cells, number of timesteps
+      cadence in output trajectory file ptm_output/ptm_????.dat
+      cadence of input E&B files in ptm_data (note that the 4-digit number on these files
+      indicates the timestep, and these files are used by ALL runs)
+      indices ifirst and ilast of first/last epochs of E&B files to be read by PTM, etc.
+    IMPORTANT:  Choose these global pars and make sure that the spatial grid has same number of nodes 
+                (nx)(ny)(nz) as outputted by module ```ptm_preprocessing.py``` in ```ptm_parameters``` file (see 1b above).
+ b. file "dist_density_????.txt" with parameters for the spatial distribution:
+    first line:
+      idens=1 -> single-location in RE
+      idens=2 -> cube corners in RE
+      idens=3 -> fixed radial distance in RE in equatorial plane, MLT range in hours
+ c. file "dist_velocity_????.txt" with parameters for the energy/PA distributions:
+    first line:
+      idist=1 -> single E/keV, single PA/deg, single or random phase angle
+      idist=2 -> vtperp and vtpara in km/s, single or random phase angle
+      idist=3 -> uniform flux-map mode: # of Energies, # of PitchAngles, gyropase phi, low/high E/PA
+      idist=4 -> user-specified flux map mode: as above (first three)
+
+ IMPORTANT: For each of the 3 switches above (runid, idens, idist), set all parameters (after -> above).               
+  Alternatively, you can just edit existing files in dir ptm_input/ and remember that PTM will read the 
+  three input files that have the N=runid specified when PTM is run.
 
 --------------
 
@@ -60,7 +94,7 @@ A. Preparing PTM input files
 
 -----------------------------------------------
 
-B. To run PTM:
+### Running PTM
 
  I. INPUT 
     The SHIELDS-PTM simulation is configured using following files:
@@ -103,8 +137,8 @@ B. To run PTM:
          at any point in the simulation cube through interpolation (calls subroutine tricubic_interpolate in module INTERPOLATION)
          at each timestep though linear interpolation
 
-
- II. NUMERICAL CALCULATIONS
+<!-- pagebreak -->
+## Numerical Approach
 
  1. Guiding-center (GC) drift mode vs Full-orbit (FO) integration
 
@@ -168,12 +202,9 @@ B. To run PTM:
  particle in GC mode.
 
 
- 4. How long does it take to run PTM (on HPC) for a FIXED ADVANCING TIME ?
+ 4. Timestepping
 
  4A. In GC mode
-
- One timestep advancing by module STEPPER takes ~70 musecs % For an Electron (at L=5), E=100 keV, PA=90 deg
-
  Timestep size dT is set by particle velocity vel and all accelerations involved acc.
  Consequently, for a fixed advancing time Thi, run duration Trun depends on particle PA, energy E, and mass m
  (besides E and B fields): Trun ~1/dT ~vel/acc. If acc~force/m, then a naive expectation would be that
@@ -200,7 +231,7 @@ B. To run PTM:
 
  4B. In FO mode
 
- One timestep advancing by module STEPPER takes ~50 musecs % For an Electron (at L=5), E=100 keV, PA=90 deg
+ Testing the full orbital motion using a 100keV electron at L=5 (pitch angle ~ 90deg), one timestep takes about 50 microsecs on a relatively modern test machine.
 
  Timestep size dT is set by particle gyration period T_g ~ gamma*m/B, thus run duration,
   a. depends on particle mass Trun ~ 1/m  (relevant for ions, which do not satisfy the GC mode criterion),
@@ -217,13 +248,13 @@ B. To run PTM:
 
 
 
- 5. Integrator of ODE for particle motion
+ 5. Integration of ODE for particle motion
 
- In subroutine "stepper_push", time-integration can be done with either
- a. a fixed timestep Runge-Kutta integrator = subroutine "RK4" in module STEPPER, if istep=1 in file "ptm_parameters" or
- b. an adaptive timestep integrator = subroutine "range_integrator" in module RKSUITE, if istep=2 in file "ptm_parameters"
+ In subroutine ```push```, time-integration can be done with either
+  - a fixed timestep, 4th-order Runge-Kutta integrator: subroutine ```rk4``` in module ```pusher```, if istep=1 in file "ptm_parameters" or
+  - an adaptive timestep Runge-Kutta integrator with error control: subroutine ```range_integrator``` in module ```rksuite```, if istep=2 in file "ptm_parameters"
  without a dynamical switching between these integrators.
- Note: RKSuite integrator takes 4x more CPU than RK4. Need to understand if that extra effort pays off.
+ Note: The RKSuite adaptive integrator is much more computationally-expensive than the fixed-step RK4 method.
 
 
  6. Particle periodic motions
@@ -232,12 +263,12 @@ B. To run PTM:
  a. Gyration period is Tgyr = 0.14ms*(250nT/B) for electrons, a factor mp/me=1837 larger for protons -> 0.26s
      (independent of particle energy E for non-relativistic particles)
     Conclusion: particle orbit is (much) under-sampled in output file "ptm_????.dat"
- b. Bounce period is Tb = (0.6-0.9)s*sqrt(100keV/E)*(R/5RE) for non-rel electrons, a factor sqrt(mp/me)=43 larger for protons
+ b. Bounce period is Tb = (0.6-0.9)s x sqrt(100keV/E)(R/5RE) for non-relativistic electrons, a factor sqrt(mp/me)=43 larger for protons
      coefficient is weakly dependent on pitch angle because mirror point goes to a larger zmax with decreasing PA but vpara
       increases with decr PA, so that zmax/cos(PA) is "stiff", from PTM: coeff=0.58 for PA=80, coef=0.93 for PA=10
     Conclusion: bounce motion is under-sampled for els, well-sampled for prot in output file "ptm_N.dat"
  c. Particle drift is dominated by radial dependence of B (ExB drift has a velocity 10x smaller).
-    Drift period Td = 1.8h*(B/250nT)*(R/5RE)^2*(100keV/E) (any particle) has a very weak dependence on PA
+    Drift period Td = 1.8h(B/250nT)(100keV/E)(R/5RE)^2 (any particle) has a very weak dependence on PA
      (note drift velocity ~ vperp^2/B = const along field line, due to 1st invariant -> spatial drift constant during bounce
       factor 1: smaller PA implies smaller vperp in equatorial plane and smaller spatial drift velocity
       factor 2: smaller PA implies access to higher latitudes, where the angular drift is larger for constant drift velocity,
@@ -245,7 +276,7 @@ B. To run PTM:
   Conclusion: drift motion is well-sampled in output file "ptm_????.dat"
 
 
- III. OUTPUT
+## Output Files
 
  The PTM simulation outputs in two different types of output files:
  "ptm_????.dat" if idist=1,2 (monoenergetic particles/Maxwellian distribution)
@@ -306,3 +337,89 @@ B. To run PTM:
  UNITS:
   flux in 1/(keV cm^2 s sr)
   omni-flux in 1/(keV cm^2 s)
+
+## File Formats
+
+### Input files: PTM Fields
+As noted previusly, several SWMF/BATSRUS output formats are supported by the SHIELDS-PTM preprocessing.
+The 3D "IDL" format files use the flexible SpacePy reader so most variable sets can be used (SI unit output is required).
+The Tecplot format files from BATSRUS must use a specific output format (```3d MHD tec```). A nominal column layout is given here:
+```
+x   y   z   rho    ux   uy   uz    bx  by  bz   P    jx     jy     jz
+RE  RE  RE  Mp/cc  km/s km/s km/s  nT  nT  nT   nPa  muA/m2 muA/m2 muA/m2
+```
+
+
+#### Notes on format
+The file is ASCII and will have a filename following the
+ptm_fields_XXXX.dat format, where XXXX is a zero-padded number
+indicating the timestep.
+
+#### Header
+The first line of the header gives the (integer) number of grid
+points in each dimension, e.g., for a 75x75x75 grid:
+```
+75 75 75
+```
+
+The next 3 lines give the coordinates of the grid points. First
+the X-coordinates are given, followed by a newline. Then the Y
+and Z coordinates. For a regular cube in (X,Y,Z) centered on the
+origin, these three lines will be identical. For a 75x75x75 grid
+centered at (0, 0, 0), extending from -6 to 6 in each dimension,
+the lines will be as follows:
+```
+-6.00000e+00 -5.83784e+00 -5.67568e+00 -5.51351e+00 -5.35135e+00 -5.18919e+00 -5.02703e+00 -4.86486e+00 -4.70270e+00 -4.54054e+00 -4.37838e+00 -4.21622e+00 -4.05405e+00 -3.89189e+00 -3.72973e+00 -3.56757e+00 -3.40541e+00 -3.24324e+00 -3.08108e+00 -2.91892e+00 -2.75676e+00 -2.59459e+00 -2.43243e+00 -2.27027e+00 -2.10811e+00 -1.94595e+00 -1.78378e+00 -1.62162e+00 -1.45946e+00 -1.29730e+00 -1.13514e+00 -9.72973e-01 -8.10811e-01 -6.48649e-01 -4.86486e-01 -3.24324e-01 -1.62162e-01  0.00000e+00  1.62162e-01  3.24324e-01  4.86486e-01  6.48649e-01  8.10811e-01  9.72973e-01  1.13514e+00  1.29730e+00  1.45946e+00  1.62162e+00  1.78378e+00  1.94595e+00  2.10811e+00  2.27027e+00  2.43243e+00  2.59459e+00  2.75676e+00  2.91892e+00  3.08108e+00  3.24324e+00  3.40541e+00  3.56757e+00  3.72973e+00  3.89189e+00  4.05405e+00  4.21622e+00  4.37838e+00  4.54054e+00  4.70270e+00  4.86486e+00  5.02703e+00  5.18919e+00  5.35135e+00  5.51351e+00  5.67568e+00  5.83784e+00  6.00000e+00
+```
+
+All subsequent rows are data in the following format:
+```
+i j k Bx[i,j,k] By[i,j,k] Bz[i,j,k] Ex[i,j,k] Ey[i,j,k] Ez[i,j,k]
+```
+where i, j and k are the index into the grid coordinates.
+The indexing starts from 1 (not zero), thus for a 75x75x75 grid
+the rows will start with indices
+```
+   1    1    1 ...
+   1    1    2 ...
+   1    1    3 ...
+   .
+   .
+   .
+   1    1   75 ...
+   1    2    1 ...
+   .
+   .
+   .
+   75  75  74 ...
+   75  75  75 ...
+```
+All coordinate indices are integer, and all cordinate and data values
+are floating point. The usual format is `[-]1.23456e+00`, that is,
+six digits plus a two digit exponent. The sign is optionally included
+as the leading character.
+
+#### Revision History
+Earlier versions of SHIELDS-PTM used binary inputs, with each
+component of both E and B having separate files. The grid layout
+was stored in yet another file. To make it easier to ensure
+consistency between files and to make the files more user-friendly
+the format was changed to a single ASCII file. This is what is
+described in this document.
+
+### Input Files: Run Configuration
+
+Three different files are required to fully specify the test particle simulation:
+```ptm_parameters_rrrr.txt```, ```dist_density_rrrr.txt```, and ```dist_velocity_rrrr.txt```.
+The first of these set the options for the simulation, including particle mass and charge,
+direction of time integration, integrator, etc. The latter two specify the distribution of
+test particles.
+
+#### Simulation Parameters
+
+#### Test Particle Distribution
+
+
+### Output Files: Trajectories
+
+### Output Files: Flux Map

@@ -22,19 +22,19 @@ use rksuite_90
 
 integer, parameter :: dp = kind(1.d0)
 
-real(dp), parameter :: ckm = 2.998d5
+real(dp), parameter :: ckm = 2.998d5   ! speed of light in km/s
 real(dp), parameter :: csq = ckm*ckm
-real(dp), parameter :: mc2 = 5.11d2
+real(dp), parameter :: mc2 = 5.11d2    ! electron rest mass energy in keV
 real(dp), parameter :: pi = 4.d0*atan(1.d0)
-real(dp), parameter :: dtor = pi/180.d0
-real(dp), parameter :: e_me = 1.758d2
-real(dp), parameter :: me_e = 1.d0/e_me
-real(dp), parameter :: re = 6371.d0
+real(dp), parameter :: dtor = pi/180.d0    ! degrees to radians
+real(dp), parameter :: e_me = 1.758d2    ! electron charge to mass ratio mult. by 1e9
+real(dp), parameter :: me_e = 1.d0/e_me    ! electron mass to charge ratio (x 1e9)
+real(dp), parameter :: re = 6371.d0    ! Volumetric Earth radius in km
 real(dp), parameter :: tol = 1.0d-6
 real(dp), parameter :: thresh = 1.0d-10
 real(dp), parameter :: twopi = 8.d0*atan(1.d0)
-real(dp), parameter :: epsilon_drift = 0.1d0
-real(dp), parameter :: epsilon_orbit = 0.05d0
+real(dp), parameter :: epsilon_drift = 0.1d0    ! factor for setting timestepping in GC approximation
+real(dp), parameter :: epsilon_orbit = 0.05d0    ! factor for setting timestepping in full orbit
 real(dp), dimension(3,3), parameter :: eye = reshape([1.d0,0.d0,0.d0,0.d0,1.d0,0.d0,0.d0,0.d0,1.d0],[3,3])
 
 integer :: runid

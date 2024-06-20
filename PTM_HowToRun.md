@@ -17,11 +17,11 @@ Further details of how PTM (Particle Tracing Model) works are given in `PTM_DOC`
 
    To use the `ptm_python` tools, first ensure that you have a Python 3 environment with
    numpy, scipy, matplotlib and spacepy installed. On institutional computing, this is
-   accomplished with modules, e.g.:
+   typically accomplished with modules, e.g.:
 
    1. `module load python/3.6-anaconda-5.0.1`
    2. `python ptm_preprocessing.py` to create PTM input data files in `ptm_data/` by interpolating the SWMF 3d output files 
-   3.  `python` to create PTM input parameter files in `ptm_input/`
+   3. `python` to create PTM input parameter files in `ptm_input/`
 
       ```
       import ptm_input
@@ -46,7 +46,7 @@ Further details of how PTM (Particle Tracing Model) works are given in `PTM_DOC`
 
    1. Ensure your environment has the same dependencies as at build time. E.g., `module load gcc/8.1.0`
    2. create a directory `ptm_input/` containing all 3 parameter files created before by `ptm_input.py`
-   3. create a directory `ptm_data/` containing all 4+3*2*n data files created before by `ptm_preprocessing.py`
+   3. create a directory `ptm_data/` containing all 4+3x2xn data files created before by `ptm_preprocessing.py`
    Note: PTM needs B&E input files at least two epochs (n >=2). If you have only one input SWMF file,
          then ptm_preprocessing will process it twice, making two sets of output files. This allows
          in-time interpolation for a static field.
@@ -78,7 +78,7 @@ Further details of how PTM (Particle Tracing Model) works are given in `PTM_DOC`
         #SBATCH --no-requeue
         #SBATCH -o slurm_%x_%j.out
         #SBATCH -e slurm_%x_%j.err
-        #SBATCH --mail-user=username@lanl.gov
+        #SBATCH --mail-user=username@inst.ext
         #SBATCH --mail-type=BEGIN,END,FAIL
 
         module purge
@@ -108,19 +108,19 @@ Further details of how PTM (Particle Tracing Model) works are given in `PTM_DOC`
 
 # Sample Workflow
    First we preprocess 45 minutes of SWMF output:
-    (default) [ptm_python]$ python ptm_preprocessing.py -t 900 -o ~/projects/SEP_ER/ns73_1 /n/projects/lanl/Carrington/ModelOutputs/SWMF_Results/Sept2017_hi_SEP1/GM/3d__mhd_1_e20170906-13*.out
-    start reading /n/projects/lanl/Carrington/ModelOutputs/SWMF_Results/Sept2017_hi_SEP1/GM/3d__mhd_1_e20170906-130000-001.out
-    done reading file /n/projects/lanl/Carrington/ModelOutputs/SWMF_Results/Sept2017_hi_SEP1/GM/3d__mhd_1_e20170906-130000-001.out
-    done interpolating file /n/projects/lanl/Carrington/ModelOutputs/SWMF_Results/Sept2017_hi_SEP1/GM/3d__mhd_1_e20170906-130000-001.out
-    start reading /n/projects/lanl/Carrington/ModelOutputs/SWMF_Results/Sept2017_hi_SEP1/GM/3d__mhd_1_e20170906-131500-020.out
-    done reading file /n/projects/lanl/Carrington/ModelOutputs/SWMF_Results/Sept2017_hi_SEP1/GM/3d__mhd_1_e20170906-131500-020.out
-    done interpolating file /n/projects/lanl/Carrington/ModelOutputs/SWMF_Results/Sept2017_hi_SEP1/GM/3d__mhd_1_e20170906-131500-020.out
-    start reading /n/projects/lanl/Carrington/ModelOutputs/SWMF_Results/Sept2017_hi_SEP1/GM/3d__mhd_1_e20170906-133000-001.out
-    done reading file /n/projects/lanl/Carrington/ModelOutputs/SWMF_Results/Sept2017_hi_SEP1/GM/3d__mhd_1_e20170906-133000-001.out
-    done interpolating file /n/projects/lanl/Carrington/ModelOutputs/SWMF_Results/Sept2017_hi_SEP1/GM/3d__mhd_1_e20170906-133000-001.out
-    start reading /n/projects/lanl/Carrington/ModelOutputs/SWMF_Results/Sept2017_hi_SEP1/GM/3d__mhd_1_e20170906-134500-009.out
-    done reading file /n/projects/lanl/Carrington/ModelOutputs/SWMF_Results/Sept2017_hi_SEP1/GM/3d__mhd_1_e20170906-134500-009.out
-    done interpolating file /n/projects/lanl/Carrington/ModelOutputs/SWMF_Results/Sept2017_hi_SEP1/GM/3d__mhd_1_e20170906-134500-009.out
+    (default) [ptm_python]$ python ptm_preprocessing.py -t 900 -o ~/projects/SEP_ER/ns73_1 ~/ModelOutputs/SWMF_Results/Sept2017_hi_SEP1/GM/3d__mhd_1_e20170906-13*.out
+    start reading ModelOutputs/SWMF_Results/Sept2017_hi_SEP1/GM/3d__mhd_1_e20170906-130000-001.out
+    done reading file ModelOutputs/SWMF_Results/Sept2017_hi_SEP1/GM/3d__mhd_1_e20170906-130000-001.out
+    done interpolating file ModelOutputs/SWMF_Results/Sept2017_hi_SEP1/GM/3d__mhd_1_e20170906-130000-001.out
+    start reading ModelOutputs/SWMF_Results/Sept2017_hi_SEP1/GM/3d__mhd_1_e20170906-131500-020.out
+    done reading file ModelOutputs/SWMF_Results/Sept2017_hi_SEP1/GM/3d__mhd_1_e20170906-131500-020.out
+    done interpolating file ModelOutputs/SWMF_Results/Sept2017_hi_SEP1/GM/3d__mhd_1_e20170906-131500-020.out
+    start reading ModelOutputs/SWMF_Results/Sept2017_hi_SEP1/GM/3d__mhd_1_e20170906-133000-001.out
+    done reading file ModelOutputs/SWMF_Results/Sept2017_hi_SEP1/GM/3d__mhd_1_e20170906-133000-001.out
+    done interpolating file ModelOutputs/SWMF_Results/Sept2017_hi_SEP1/GM/3d__mhd_1_e20170906-133000-001.out
+    start reading ModelOutputs/SWMF_Results/Sept2017_hi_SEP1/GM/3d__mhd_1_e20170906-134500-009.out
+    done reading file ModelOutputs/SWMF_Results/Sept2017_hi_SEP1/GM/3d__mhd_1_e20170906-134500-009.out
+    done interpolating file ModelOutputs/SWMF_Results/Sept2017_hi_SEP1/GM/3d__mhd_1_e20170906-134500-009.out
 
    Then we set up runs 10 minutes apart using positions along a GPS orbit (2 shown)
     (default) [SHIELDS-PTM]$ mkdir ~/projects/SEP_ER/ns72/20170906133500
@@ -140,4 +140,3 @@ Further details of how PTM (Particle Tracing Model) works are given in `PTM_DOC`
     -p 3.408 1.597 1.817
     (default) [SHIELDS-PTM]$ python makeRun.py -r 1 -o ~/projects/SEP_ER/ns72/20170906130500 -s 300 -p 3.408 1.597 1.817
     Run jobs using `source job_script.sh` from the run directory
-
