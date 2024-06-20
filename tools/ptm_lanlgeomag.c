@@ -37,6 +37,8 @@ static struct argp_option Options[] = {
     {"StartDate", 'd', "yyyymmdd",       0, "Date "},
     {"Time",      't', "UTC",            0, "Time as HHMMSS"},
     {"Verbose",   'v', "Verbose",        0, "Verbose output? 1 - Yes; 0 - No"},
+    {"DeltaT",    'l', "delta_t",        0, "Number of seconds between time steps. Default is 300."},
+    {"TTot",      'n', "t_tot",          0, "Number of time steps to use. Default is 12"},
     { 0 }
     };
 
@@ -51,6 +53,9 @@ struct Arguments {
     long int    Time;
 
     int         Verbose;
+    
+    double      DeltaT;
+    int         TTot;
     };
 
 /* Parse a single option. */
@@ -74,6 +79,12 @@ static error_t parse_opt (int key, char *arg, struct argp_state *state) {
                 break;
             case 'v':
                 arguments->Verbose = atoi(arg);
+                break;
+            case 'l':
+                arguments->DeltaT = atof(arg);
+                break;
+            case 'n':
+                arguments->TTot = atoi(arg);
                 break;
             case ARGP_KEY_ARG:
                 if (state->arg_num >= nArgs) {
@@ -111,7 +122,7 @@ int main( int argc, char *argv[] ){
     Lgm_MagModelInfo    *mInfo = Lgm_InitMagInfo(0);
     Lgm_QinDentonOne qd;
     //char model_str[] = "T96";
-    char buffer[256];
+    char buffer[282];
     char dirname[256];
 
     // grid extents to match ptm
@@ -122,9 +133,6 @@ int main( int argc, char *argv[] ){
     double n = 121; //TODO: read on cmd line
     // Number of time steps
     int nt;
-    int t_tot = 12;
-    double deltat = 300;  // seconds between time snapshots
-    double deltaJD = deltat/86400.0;
 
     /*
      *  Default option values.
@@ -134,12 +142,18 @@ int main( int argc, char *argv[] ){
     strcpy( arguments.ExtModel, "T96" );
     arguments.Time = 120000;
     arguments.Verbose = 1;
+    arguments.DeltaT = 300;
+    arguments.TTot = 12;
 
     /*
      *  Parse CmdLine arguments and options
      */
     argp_parse (&argp, argc, argv, 0, 0, &arguments);
+    strcpy(dirname, arguments.args[0]);
     verbose = arguments.Verbose;
+    int t_tot = arguments.TTot + 1; // +1 because a single timestep needs bounding fields
+    double deltat = arguments.DeltaT;
+    double deltaJD = deltat/86400.0;
     int hour = arguments.Time/10000;
     int minute = (arguments.Time - hour*10000)/100;
     int second = (arguments.Time - hour*10000) - minute*100;
@@ -229,14 +243,13 @@ int main( int argc, char *argv[] ){
         Lgm_set_QinDenton(&qd, mInfo);                  // Set params in mInfo structure.
 
         // open output files
-        sprintf(dirname, "%s_%ld", model_str, Date);
         // First test for directory
         struct stat st = {0};
         if (stat(dirname, &st) == -1) {
             mkdir(dirname, 0700);
             }
         // E/B-Field output file
-        sprintf(buffer, "%s_%ld/ptm_fields_%04d.dat", model_str, Date, il);
+        sprintf(buffer, "%s/ptm_fields_%04d.dat", dirname, il);
         FILE *fields = fopen(buffer, "w");
 
         // Write header
@@ -279,7 +292,7 @@ int main( int argc, char *argv[] ){
     }
 
     // Now write tgrid.dat file
-    sprintf(buffer, "%s_%ld/tgrid.dat", model_str, Date);
+    sprintf(buffer, "%s/tgrid.dat", dirname);
     FILE *tgrid = fopen(buffer, "w");
     for (nt=0; nt<t_tot; nt++) {
         fprintf(tgrid, "%.18e\n", 0.0 + deltat*nt);
